@@ -9,3 +9,4 @@ include_directories (BEFORE include
 add_subdirectory (lib)
 add_subdirectory (nbd)
 add_subdirectory (scst)
+add_subdirectory (test)
