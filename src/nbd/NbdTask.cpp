@@ -1,7 +1,7 @@
 /*
- * ProtoTask.h
+ * NbdTask.cpp
  *
- * Copyright (c) 2016, Andreas Griesshammer <andreas@formartionds.com>
+ * Copyright (c) 2016, Brian Szmyd <szmyd@formationds.com>
  * Copyright (c) 2016, Formation Data Systems
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -17,35 +17,17 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef PROTOTASK_H_
-#define PROTOTASK_H_
-
-// System includes
-
 // FDS includes
-#include "xdi/ApiTypes.h"
+#include "connector/nbd/NbdTask.h"
 
 namespace fds {
-namespace block {
+namespace connector {
+namespace nbd {
 
-struct ProtoTask {
-    ProtoTask(uint64_t const hdl) : handle(hdl) {}
-    inline virtual ~ProtoTask() = 0;
-    uint64_t getHandle() const  { return handle; }
+NbdTask::NbdTask(uint64_t const hdl) : ProtoTask(hdl) {
 
-    void setError(xdi::ApiErrorCode const& error) { opError = error; }
-    xdi::ApiErrorCode getError() const      { return opError; }
+}
 
-    int64_t handle;
-
-private:
-    // error of the operation
-    xdi::ApiErrorCode opError {xdi::ApiErrorCode::XDI_OK};
-};
-
-ProtoTask::~ProtoTask() { };
-
-}  // namespace block
+}  // namespace nbd
+}  // namespace connector
 }  // namespace fds
-
-#endif // PROTOTASK_H_

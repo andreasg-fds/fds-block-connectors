@@ -7,3 +7,4 @@ include_directories (BEFORE include
 			    ${FDS_INCLUDES})
 
 add_subdirectory (lib)
+add_subdirectory (nbd)

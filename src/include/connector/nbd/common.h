@@ -1,7 +1,7 @@
 /*
- * ProtoTask.h
+ * common.h
  *
- * Copyright (c) 2016, Andreas Griesshammer <andreas@formartionds.com>
+ * Copyright (c) 2016, Brian Szmyd <szmyd@formationds.com>
  * Copyright (c) 2016, Formation Data Systems
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -17,35 +17,17 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef PROTOTASK_H_
-#define PROTOTASK_H_
+#ifndef SOURCE_ACCESS_MGR_INCLUDE_CONNECTOR_NBD_COMMON_H_
+#define SOURCE_ACCESS_MGR_INCLUDE_CONNECTOR_NBD_COMMON_H_
 
-// System includes
+// Forward declare so we can hide the ev++.h include
+// in the cpp file so that it doesn't conflict with
+// the libevent headers in Thrift.
+namespace ev {
+class io;
+class async;
+class timer;
+struct dynamic_loop;
+}  // namespace ev
 
-// FDS includes
-#include "xdi/ApiTypes.h"
-
-namespace fds {
-namespace block {
-
-struct ProtoTask {
-    ProtoTask(uint64_t const hdl) : handle(hdl) {}
-    inline virtual ~ProtoTask() = 0;
-    uint64_t getHandle() const  { return handle; }
-
-    void setError(xdi::ApiErrorCode const& error) { opError = error; }
-    xdi::ApiErrorCode getError() const      { return opError; }
-
-    int64_t handle;
-
-private:
-    // error of the operation
-    xdi::ApiErrorCode opError {xdi::ApiErrorCode::XDI_OK};
-};
-
-ProtoTask::~ProtoTask() { };
-
-}  // namespace block
-}  // namespace fds
-
-#endif // PROTOTASK_H_
+#endif  // SOURCE_ACCESS_MGR_INCLUDE_CONNECTOR_NBD_COMMON_H_
