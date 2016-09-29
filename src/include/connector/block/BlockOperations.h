@@ -1,0 +1,178 @@
+/*
+ * Copyright 2016 by Formation Data Systems, Inc.
+ */
+#ifndef BLOCKOPERATIONS_H_
+#define BLOCKOPERATIONS_H_
+
+#include <map>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#include <memory>
+#include <queue>
+
+#include "xdi/ApiResponseInterface.h"
+#include "BlockTask.h"
+#include "BlockTools.h"
+#include "xdi/ApiTypes.h"
+
+#define EMPTY_ID "0000000000000000000000000000000000000000"
+
+namespace xdi {
+    class ApiInterface;
+}
+
+namespace fds {
+namespace block {
+
+class WriteContext;
+
+enum class BlockError : uint8_t {
+    connection_closed,
+    shutdown_requested,
+};
+
+/**
+ * The BlockOperations class provides a simple interface to a dynamic connector
+ * allowing block like semantics. The interface consists of three main calls to
+ * attach the volume, read data and write data. The RMW logic and operation
+ * rollup all happens in here allowing block connectors to issue their requests
+ * as fast as possible without having to deal with consistency themselves and
+ * map I/O to XdiAsyncDataApi calls.
+ */
+class BlockOperations
+    :   public xdi::ApiResponseInterface
+{
+    using string_ptr = std::shared_ptr<std::string>;
+    using xdi_error = xdi::ApiErrorCode;
+    using xdi_handle = xdi::RequestHandle;
+    using task_type = BlockTask;
+
+    using read_objects = std::vector<std::shared_ptr<std::string>>;
+
+    using read_map = std::map<uint32_t, xdi::ObjectId>;
+    using write_map = std::map<uint32_t, std::shared_ptr<std::string>>;
+
+    typedef std::unordered_map<int64_t, task_type*> response_map_type;
+  public:
+
+    BlockOperations(std::shared_ptr<xdi::ApiInterface> interface);
+    explicit BlockOperations(BlockOperations const& rhs) = delete;
+    BlockOperations& operator=(BlockOperations const& rhs) = delete;
+    ~BlockOperations() = default;
+
+    void init(std::string                      vol_name,
+              uint64_t const                   vol_id,
+              uint32_t const                   obj_size);
+    void detachVolume();
+
+    void executeTask(RWTask* task);
+
+    void shutdown();
+
+    virtual void respondTask(task_type* response) = 0;
+
+    virtual void listResp(xdi_handle const& requestId, xdi::ListBlobsResponse const& resp, xdi_error const& e) override {};
+    virtual void readBlobResp(xdi_handle const& requestId, xdi::ReadBlobResponse const& resp, xdi_error const& e) override;
+    virtual void writeBlobResp(xdi_handle const& requestId, xdi::WriteBlobResponse const& resp, xdi_error const& e) override;
+    virtual void upsertBlobMetadataCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
+    virtual void upsertBlobObjectCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
+    virtual void readObjectResp(xdi_handle const& requestId, xdi::BufferPtr const& resp, xdi_error const& e) override;
+    virtual void writeObjectResp(xdi_handle const& requestId, xdi::ObjectId const& resp, xdi_error const& e) override;
+    virtual void deleteBlobResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
+    virtual void diffBlobResp(xdi_handle const& requestId, xdi::DiffBlobResponse const& resp, xdi_error const& e) override {};
+    virtual void diffAllBlobsResp(xdi_handle const& requestId, xdi::DiffAllBlobsResponse const& resp, xdi_error const& e) override {};
+    virtual void diffVolumesResp(xdi_handle const& requestId, xdi::DiffVolumesResponse const& resp, xdi_error const& e) override {};
+    virtual void statVolumeResp(xdi_handle const& requestId, xdi::VolumeStatusPtr const& resp, xdi_error const& e) override {};
+    virtual void listAllVolumesResp(xdi_handle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi_error const& e) override {};
+
+  private:
+    void finishResponse(task_type* response);
+
+    std::pair<bool,std::shared_ptr<std::string>>
+     drainUpdateChain(xdi_handle const&             requestId,
+                      uint64_t const                offset);
+
+    BlockTask* findResponse(uint64_t handle);
+
+    void respondToWrites(std::queue<BlockTask*>& q, xdi_error const& e);
+
+    void _executeTask(RWTask* task);
+
+    void enqueueOperations(BlockTask* task, read_map const& r, write_map const& w);
+
+    void performRead
+    (
+      xdi_handle const&              requestId,
+      xdi::ReadBlobResponse const&   resp,
+      xdi_error const&               e
+    );
+
+    void performWrite
+    (
+      xdi_handle const&              requestId,
+      xdi::ReadBlobResponse const&   resp,
+      xdi_error const&               e
+    );
+
+    void performWriteSame
+    (
+      xdi_handle const&              requestId,
+      xdi::ReadBlobResponse const&   resp,
+      xdi_error const&               e
+    );
+
+    void performUnmap
+    (
+      xdi_handle const&              requestId,
+      xdi::ReadBlobResponse const&   resp,
+      xdi_error const&               e
+    );
+
+    void queuePartialWrite
+    (
+      xdi_handle const& requestId,
+      xdi::ReadBlobResponse const& resp,
+      WriteTask* task,
+      uint32_t& seqId,
+      read_map& rmap,
+      write_map& wmap,
+      std::shared_ptr<std::string>& buf,
+      uint32_t const& blockOffset,
+      uint32_t const& writeOffset,
+      bool const isNewBlob
+    );
+
+    // api we've built
+    string_ptr              volumeName;
+    uint64_t                volumeId;
+    string_ptr              empty_buffer;
+    uint32_t                maxObjectSizeInBytes {0};
+
+    bool shutting_down {false};
+
+    // for all reads/writes to AM
+    string_ptr             blobName;
+    string_ptr             domainName;
+    std::shared_ptr<int32_t>    blobMode;
+    std::shared_ptr< std::map<std::string, std::string> > emptyMeta;
+
+    std::shared_ptr<xdi::ApiInterface>      api;
+    std::shared_ptr<WriteContext>           ctx;
+
+    std::mutex readObjectsLock;
+    std::unordered_map<uint64_t, std::shared_ptr<read_objects>>      readObjects;
+
+    // keep current handles for which we are waiting responses
+    std::mutex respLock;
+    response_map_type responses;
+
+    // Make sure only one thread is draining the update chain at a time
+    std::mutex        drainChainMutex;
+};
+
+}  // namespace block
+}  // namespace fds
+
+#endif  // BLOCKOPERATIONS_H_
