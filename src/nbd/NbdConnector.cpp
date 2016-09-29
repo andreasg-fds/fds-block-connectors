@@ -299,9 +299,6 @@ NbdConnector::listAllVolumesResp(xdi::RequestHandle const& requestId, xdi::ListA
             xdi::VolumeDescriptorVisitor v;
             if ((xdi::VolumeType::ISCSI_VOLUME_TYPE == vol->match(&v))) {
                 auto currVol = std::static_pointer_cast<xdi::IscsiVolumeDescriptor>(vol);
-                //VolumeDesc  currVol(vol->volumeName, fds_volid_t(vol->volumeId));
-                //currVol.capacity = iscsiVol->capacity;
-                //currVol.maxObjSizeInBytes = vol->maxObjectSize;
                 volume_id_map.emplace(std::make_pair(vol->volumeName, currVol));
             }
         }
