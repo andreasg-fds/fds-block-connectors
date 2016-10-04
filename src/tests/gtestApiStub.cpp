@@ -277,12 +277,5 @@ TEST_F(ApiStubFixture, DeleteBlobMissing) {
 
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
-#if 0
-    po::options_description opts("Allowed options");
-    opts.add_options()
-        ("help", "produce help message")
-        ("puts-cnt", po::value<int>()->default_value(1), "puts count");
-    AmCacheTest::init(argc, argv, opts);
-#endif
     return RUN_ALL_TESTS();
 }
