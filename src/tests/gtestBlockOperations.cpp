@@ -5,6 +5,8 @@
 #include "connector/block/Tasks.h"
 
 static const uint32_t OBJECTSIZE = 131072;
+static const uint32_t LBASIZE = 512;
+static const uint32_t LBA_PER_OBJECT = OBJECTSIZE/LBASIZE;
 
 class TestTask : public fds::block::ProtoTask {
 public:
@@ -66,6 +68,9 @@ protected:
     };
 };
 
+/******************************
+** Basic Read/Write tests
+******************************/
 // Test reading nonexisting blob/object
 // Read full object at offset 0
 TEST_F(TestConnectorFixture, ReadNonExisting) {
@@ -310,6 +315,207 @@ TEST_F(TestConnectorFixture, WriteTestRepeatingRMW) {
     connectorPtr->executeTask(readTask);
     EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
 }
+
+/******************************
+** WriteSame Tests
+******************************/
+
+// Write 2 objects worth of random data
+// Then overwrite them using 512 byte writeSame command
+TEST_F(TestConnectorFixture, WriteSameTestAligned) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 2 * OBJECTSIZE;
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    TestTask testTask2(seqId++);
+    auto writeSameTask = new fds::block::WriteSameTask(&testTask2);
+    auto writeSameBuffer = std::make_shared<std::string>(LBASIZE, 'x');
+    auto expectBuffer = std::make_shared<std::string>();
+    for (unsigned int i = 0; i < 2 * LBA_PER_OBJECT; ++i) {
+        *expectBuffer += *writeSameBuffer;
+    }
+    writeSameTask->set(0, length);
+    writeSameTask->setWriteBuffer(writeSameBuffer);
+    connectorPtr->executeTask(writeSameTask);
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(expectBuffer));
+}
+
+// Write 2 objects worth of random data
+// Then use writeSame to overwrite end aligned
+TEST_F(TestConnectorFixture, WriteSameTestEndAligned) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 2 * OBJECTSIZE;
+    uint32_t num_lbas = 5;
+    uint64_t writeSameOffset = (LBA_PER_OBJECT - num_lbas) * LBASIZE;
+    uint32_t writeSameLength = num_lbas * LBASIZE;
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    TestTask testTask2(seqId++);
+    auto writeSameTask = new fds::block::WriteSameTask(&testTask2);
+    auto writeSameBuffer = std::make_shared<std::string>(LBASIZE, 'x');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(writeSameOffset + (i * LBASIZE), LBASIZE, *writeSameBuffer);
+    }
+    writeSameTask->set(writeSameOffset, writeSameLength);
+    writeSameTask->setWriteBuffer(writeSameBuffer);
+    connectorPtr->executeTask(writeSameTask);
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Write 2 objects worth of random data
+// Then use writeSame to overwrite start aligned
+TEST_F(TestConnectorFixture, WriteSameTestStartAligned) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 2 * OBJECTSIZE;
+    uint32_t num_lbas = 5;
+    uint64_t writeSameOffset = OBJECTSIZE;
+    uint32_t writeSameLength = num_lbas * LBASIZE;
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    TestTask testTask2(seqId++);
+    auto writeSameTask = new fds::block::WriteSameTask(&testTask2);
+    auto writeSameBuffer = std::make_shared<std::string>(LBASIZE, 'x');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(writeSameOffset + (i * LBASIZE), LBASIZE, *writeSameBuffer);
+    }
+    writeSameTask->set(writeSameOffset, writeSameLength);
+    writeSameTask->setWriteBuffer(writeSameBuffer);
+    connectorPtr->executeTask(writeSameTask);
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Write 3 objects worth of random data
+// Then use writeSame to overwrite unaligned
+TEST_F(TestConnectorFixture, WriteSameTestUnaligned) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 3 * OBJECTSIZE;
+    uint32_t num_lbas = 337;
+    uint64_t writeSameOffset = 200 * LBASIZE;
+    uint32_t writeSameLength = num_lbas * LBASIZE;
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    TestTask testTask2(seqId++);
+    auto writeSameTask = new fds::block::WriteSameTask(&testTask2);
+    auto writeSameBuffer = std::make_shared<std::string>(LBASIZE, 'x');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(writeSameOffset + (i * LBASIZE), LBASIZE, *writeSameBuffer);
+    }
+    writeSameTask->set(writeSameOffset, writeSameLength);
+    writeSameTask->setWriteBuffer(writeSameBuffer);
+    connectorPtr->executeTask(writeSameTask);
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Use writeSame to write a few LBAs in the middle of an object
+TEST_F(TestConnectorFixture, WriteSameTestMiddle) {
+    uint64_t seqId = 0;
+    uint64_t readOffset = 0;
+    uint32_t readLength = OBJECTSIZE;
+    uint32_t num_lbas = 5;
+    uint32_t offset_lbas = 10;
+    uint64_t writeSameOffset = offset_lbas * LBASIZE;
+    uint32_t writeSameLength = num_lbas * LBASIZE;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(readLength);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(readOffset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    TestTask testTask2(seqId++);
+    auto writeSameTask = new fds::block::WriteSameTask(&testTask2);
+    auto writeSameBuffer = std::make_shared<std::string>(LBASIZE, 'x');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(writeSameOffset + (i * LBASIZE), LBASIZE, *writeSameBuffer);
+    }
+    writeSameTask->set(writeSameOffset, writeSameLength);
+    writeSameTask->setWriteBuffer(writeSameBuffer);
+    connectorPtr->executeTask(writeSameTask);
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(readOffset, readLength);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Use writeSame to write a few LBAs in the middle of a non existing object
+TEST_F(TestConnectorFixture, WriteSameTestNonExistingObject) {
+    uint64_t seqId = 0;
+    uint64_t readOffset = 0;
+    uint32_t readLength = OBJECTSIZE;
+    uint32_t num_lbas = 5;
+    uint32_t offset_lbas = 10;
+    uint64_t writeSameOffset = offset_lbas * LBASIZE;
+    uint32_t writeSameLength = num_lbas * LBASIZE;
+
+    auto fullBuffer = std::make_shared<std::string>(readLength, '\0');
+
+    TestTask testTask(seqId++);
+    auto writeSameTask = new fds::block::WriteSameTask(&testTask);
+    auto writeSameBuffer = randomStrGen(LBASIZE);
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        fullBuffer->replace(writeSameOffset + (i * LBASIZE), LBASIZE, *writeSameBuffer);
+    }
+    writeSameTask->set(writeSameOffset, writeSameLength);
+    writeSameTask->setWriteBuffer(writeSameBuffer);
+    connectorPtr->executeTask(writeSameTask);
+
+    TestTask testTask2(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask2);
+    readTask->set(readOffset, readLength);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuffer));
+}
+
+/******************************
+** Unmap Tests
+******************************/
 
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
