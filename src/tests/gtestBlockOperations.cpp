@@ -517,6 +517,336 @@ TEST_F(TestConnectorFixture, WriteSameTestNonExistingObject) {
 ** Unmap Tests
 ******************************/
 
+// Write 2 objects worth of random data
+// Then overwrite them using single unmap command
+TEST_F(TestConnectorFixture, UnmapTestAligned) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 2 * OBJECTSIZE;
+    uint32_t num_lbas = 2 * LBA_PER_OBJECT;
+    uint32_t offset_lba = 0;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto expectBuffer = std::make_shared<std::string>(length, '\0');
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(expectBuffer));
+}
+
+// Write 2 objects worth of random data
+// Then overwrite them using two unmap commands
+TEST_F(TestConnectorFixture, UnmapTestAligned2) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 2 * OBJECTSIZE;
+    uint32_t num_lbas = LBA_PER_OBJECT;
+    uint32_t offset_lba = 0;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    fds::block::UnmapTask::UnmapRange range2;
+    range2.offset = (LBA_PER_OBJECT + offset_lba) * LBASIZE;
+    range2.length = num_lbas * LBASIZE;
+    write_vec->push_back(range2);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto expectBuffer = std::make_shared<std::string>(length, '\0');
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(expectBuffer));
+}
+
+// Write 2 objects worth of random data
+// Then unmap a spanning range
+// |-------------uuu|
+// |uu--------------|
+TEST_F(TestConnectorFixture, UnmapTestSpanning) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 2 * OBJECTSIZE;
+    uint32_t num_lbas = 50;
+    uint32_t offset_lba = LBA_PER_OBJECT - 30;
+    uint64_t unmapOffset = offset_lba * LBASIZE;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto unmapBuffer = std::make_shared<std::string>(LBASIZE, '\0');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(unmapOffset + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Write 4 objects worth of random data
+// Then unmap two spanning ranges
+// |-------------uuu|
+// |uu--------------|
+// |------------uuuu|
+// |uuuuu-----------|
+TEST_F(TestConnectorFixture, UnmapTestDualSpanning) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = 4 * OBJECTSIZE;
+    uint32_t num_lbas = 50;
+    uint32_t offset_lba = LBA_PER_OBJECT - 30;
+    uint64_t unmapOffset = offset_lba * LBASIZE;
+    uint32_t num_lbas2 = 90;
+    uint32_t offset_lba2 = (2 * LBA_PER_OBJECT) + (LBA_PER_OBJECT - 40);
+    uint64_t unmapOffset2 = offset_lba2 * LBASIZE;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    fds::block::UnmapTask::UnmapRange range2;
+    range2.offset = (offset_lba2) * LBASIZE;
+    range2.length = num_lbas2 * LBASIZE;
+    write_vec->push_back(range2);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto unmapBuffer = std::make_shared<std::string>(LBASIZE, '\0');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(unmapOffset + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+    for (unsigned int i = 0; i < num_lbas2; ++i) {
+        writeBuffer->replace(unmapOffset2 + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Write 1 object worth of random data
+// Then unmap start aligned
+// |uu-----------------------|
+TEST_F(TestConnectorFixture, UnmapTestStartAligned) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = OBJECTSIZE;
+    uint32_t num_lbas = 20;
+    uint32_t offset_lba = 0;
+    uint64_t unmapOffset = offset_lba * LBASIZE;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto unmapBuffer = std::make_shared<std::string>(LBASIZE, '\0');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(unmapOffset + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Write 1 object worth of random data
+// Then unmap end aligned
+// |-------------------------uu|
+TEST_F(TestConnectorFixture, UnmapTestEndAligned) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = OBJECTSIZE;
+    uint32_t num_lbas = 20;
+    uint32_t offset_lba = LBA_PER_OBJECT - num_lbas;
+    uint64_t unmapOffset = offset_lba * LBASIZE;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto unmapBuffer = std::make_shared<std::string>(LBASIZE, '\0');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(unmapOffset + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Write 1 object worth of random data
+// Then unmap in the middle
+// |----------uu----------|
+TEST_F(TestConnectorFixture, UnmapTestMiddle) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = OBJECTSIZE;
+    uint32_t num_lbas = 20;
+    uint32_t offset_lba = 50;
+    uint64_t unmapOffset = offset_lba * LBASIZE;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto unmapBuffer = std::make_shared<std::string>(LBASIZE, '\0');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(unmapOffset + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
+// Write 1 object worth of random data
+// Then unmap both start and end aligned
+// |uuu-----------uuuu|
+TEST_F(TestConnectorFixture, UnmapTestBothEnds) {
+    uint64_t seqId = 0;
+    uint64_t offset = 0;
+    uint32_t length = OBJECTSIZE;
+    uint32_t num_lbas = 30;
+    uint32_t offset_lba = 0;
+    uint64_t unmapOffset = offset_lba * LBASIZE;
+    uint32_t num_lbas2 = 40;
+    uint32_t offset_lba2 = LBA_PER_OBJECT - num_lbas2;
+    uint64_t unmapOffset2 = offset_lba2 * LBASIZE;
+
+    TestTask testTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(&testTask);
+    auto writeBuffer = randomStrGen(length);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask->set(offset, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
+    fds::block::UnmapTask::UnmapRange range;
+    range.offset = offset_lba * LBASIZE;
+    range.length = num_lbas * LBASIZE;
+    write_vec->push_back(range);
+    fds::block::UnmapTask::UnmapRange range2;
+    range2.offset = (offset_lba2) * LBASIZE;
+    range2.length = num_lbas2 * LBASIZE;
+    write_vec->push_back(range2);
+    TestTask testTask2(seqId++);
+    auto unmapTask = new fds::block::UnmapTask(&testTask2, std::move(write_vec));
+    connectorPtr->executeTask(unmapTask);
+
+    auto unmapBuffer = std::make_shared<std::string>(LBASIZE, '\0');
+    for (unsigned int i = 0; i < num_lbas; ++i) {
+        writeBuffer->replace(unmapOffset + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+    for (unsigned int i = 0; i < num_lbas2; ++i) {
+        writeBuffer->replace(unmapOffset2 + (i * LBASIZE), LBASIZE, *unmapBuffer);
+    }
+
+    TestTask testTask3(seqId++);
+    auto readTask = new fds::block::ReadTask(&testTask3);
+    readTask->set(offset, length);
+    connectorPtr->executeTask(readTask);
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+}
+
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
     uint32_t seed = 1;
