@@ -41,6 +41,7 @@ void calculateOffsets
   uint32_t const&  maxObjectSizeInBytes
 )
 {
+    if (maxObjectSizeInBytes == 0) return;
     auto absoluteEndOffset = offset + length - 1;
     info.startBlockOffset = offset / maxObjectSizeInBytes;
     info.endBlockOffset = absoluteEndOffset / maxObjectSizeInBytes;
