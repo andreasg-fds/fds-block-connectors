@@ -482,13 +482,17 @@ void BlockOperations::performWriteSame
         auto const& startBlockOffset = newOffset.startBlockOffset;
         GLOGDEBUG << "offset:" << startBlockOffset;
         auto writeBuf = std::make_shared<std::string>();
-        for (unsigned int i = 0; i < (maxObjectSizeInBytes - newOffset.startDiffOffset) / bufsize; ++i) {
+        auto writeLength = (maxObjectSizeInBytes - newOffset.startDiffOffset);
+        if (true == newOffset.isSingleObject()) {
+            writeLength -= newOffset.endDiffOffset;
+        }
+        for (unsigned int i = 0; i <  writeLength / bufsize; ++i) {
             *writeBuf += *bytes;
         }
         queuePartialWrite(requestId, resp, writeTask, seqId, objectsToRead, objectsToWrite, writeBuf, startBlockOffset, newOffset.startDiffOffset, isNewBlob);
     }
     // Determine if we need a RMW for the last block
-    if (0 < newOffset.endDiffOffset) {
+    if (((false == newOffset.isSingleObject()) || (0 == newOffset.startDiffOffset)) && (0 < newOffset.endDiffOffset)) {
         auto const& endBlockOffset = newOffset.endBlockOffset;
         GLOGDEBUG << "offset:" << endBlockOffset;
         auto writeBuf = std::make_shared<std::string>();
