@@ -6,14 +6,14 @@ extern "C" {
 #include <assert.h>
 }
 
-#define LOGTRACE    std::cerr
-#define LOGDEBUG    std::cerr
-#define LOGIO       std::cerr
-#define LOGNORMAL   std::cerr
-#define LOGWARN     std::cerr
-#define LOGERROR    std::cerr
-#define LOGNOTIFY   std::cerr
-#define LOGCRITICAL std::cerr
+#define LOGTRACE    std::cerr << std::endl
+#define LOGDEBUG    std::cerr << std::endl
+#define LOGIO       std::cerr << std::endl
+#define LOGNORMAL   std::cerr << std::endl
+#define LOGWARN     std::cerr << std::endl
+#define LOGERROR    std::cerr << std::endl
+#define LOGNOTIFY   std::cerr << std::endl
+#define LOGCRITICAL std::cerr << std::endl
 
 #define GLOGTRACE       LOGTRACE
 #define GLOGDEBUG       LOGDEBUG
