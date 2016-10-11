@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <condition_variable>
+
 #include "connector/block/BlockOperations.h"
 #include "stub/FdsStub.h"
 #include "stub/ApiStub.h"
@@ -13,12 +15,24 @@ public:
     TestTask(uint64_t const hdl) : fds::block::ProtoTask(hdl) {}
 };
 
+std::mutex mutex;
+std::condition_variable cond_var;
+int count {0};
+int expected {0};
+
 class TestConnector : public fds::block::BlockOperations {
 public:
-    TestConnector(std::shared_ptr<xdi::ApiInterface> interface) : fds::block::BlockOperations(interface) {}
+    TestConnector(std::shared_ptr<xdi::ApiInterface> interface, bool multi) : fds::block::BlockOperations(interface), isMultithreaded(multi) {}
     ~TestConnector() {}
 
-    bool verifyBuffers(std::shared_ptr<std::string>& buf) {
+    bool verifyBuffers(std::vector<std::shared_ptr<std::string>>& bufs) {
+        for (auto& b : bufs) {
+            if (true == verifyBuffer(b)) return true;
+        }
+        return false;
+    }
+
+    bool verifyBuffer(std::shared_ptr<std::string>& buf) {
         if ((buf->size() != readBuffer->size()) || (*buf != *readBuffer)) return false;
         return true;
     }
@@ -27,7 +41,7 @@ public:
         auto task = static_cast<TestTask*>(response->getProtoTask());
         fds::block::TaskVisitor v;
         if (fds::block::TaskType::READ == response->match(&v)) {
-            auto btask = static_cast<fds::block::ReadTask*>(response);
+            auto btask = static_cast<fds::block::ReadTask *>(response);
             readBuffer.reset(new std::string());
             uint32_t i = 0, context = 0;
             std::shared_ptr<std::string> buf = btask->getNextReadBuffer(context);
@@ -37,9 +51,18 @@ public:
                 buf = btask->getNextReadBuffer(context);
             }
         }
+        if (true == isMultithreaded) {
+            delete response->getProtoTask();
+            std::lock_guard<std::mutex> lg(mutex);
+            ++count;
+            if (count == expected) {
+                cond_var.notify_one();
+            }
+        }
     }
 private:
     std::shared_ptr<std::string> readBuffer;
+    bool                         isMultithreaded;
 };
 
 std::shared_ptr<std::string> randomStrGen(int length) {
@@ -60,7 +83,23 @@ protected:
     void SetUp() {
         stubPtr = std::make_shared<xdi::FdsStub>();
         interfacePtr = std::make_shared<xdi::ApiStub>(stubPtr, 0);
-        connectorPtr = std::make_shared<TestConnector>(interfacePtr);
+        connectorPtr = std::make_shared<TestConnector>(interfacePtr, false);
+        connectorPtr->init("testVol", 0, OBJECTSIZE);
+    };
+    void TearDown() {
+
+    };
+};
+
+class AsyncTestConnectorFixture : public ::testing::Test {
+protected:
+    std::shared_ptr<xdi::FdsStub> stubPtr;
+    std::shared_ptr<xdi::ApiInterface> interfacePtr;
+    std::shared_ptr<TestConnector> connectorPtr;
+    void SetUp() {
+        stubPtr = std::make_shared<xdi::FdsStub>();
+        interfacePtr = std::make_shared<xdi::AsyncApiStub>(stubPtr, 0);
+        connectorPtr = std::make_shared<TestConnector>(interfacePtr, true);
         connectorPtr->init("testVol", 0, OBJECTSIZE);
     };
     void TearDown() {
@@ -80,7 +119,7 @@ TEST_F(TestConnectorFixture, ReadNonExisting) {
     auto fullBuf = std::make_shared<std::string>(OBJECTSIZE, '\0');
     readTask->set(0, OBJECTSIZE);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 // Test reading nonexisting blob/object
@@ -94,7 +133,7 @@ TEST_F(TestConnectorFixture, ReadNonExisting2) {
     auto fullBuf = std::make_shared<std::string>(length, '\0');
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 // Test reading nonexisting object but existing blob
@@ -118,7 +157,7 @@ TEST_F(TestConnectorFixture, ReadNonExisting3) {
     auto fullBuf = std::make_shared<std::string>(readLength, '\0');
     readTask->set(readOffset, readLength);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 TEST_F(TestConnectorFixture, WriteTest) {
@@ -133,7 +172,7 @@ TEST_F(TestConnectorFixture, WriteTest) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(0, write_buffer->size());
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(write_buffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(write_buffer));
 }
 
 TEST_F(TestConnectorFixture, WriteTestMultipleAligned) {
@@ -148,7 +187,7 @@ TEST_F(TestConnectorFixture, WriteTestMultipleAligned) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(0, write_buffer->size());
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(write_buffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(write_buffer));
 }
 
 TEST_F(TestConnectorFixture, WriteTestMultipleUnaligned) {
@@ -168,7 +207,7 @@ TEST_F(TestConnectorFixture, WriteTestMultipleUnaligned) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(0, numWrites * 1000);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 TEST_F(TestConnectorFixture, WriteTestMultipleUnalignedWithOffset) {
@@ -189,7 +228,7 @@ TEST_F(TestConnectorFixture, WriteTestMultipleUnalignedWithOffset) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(offset, numWrites * 1000);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 // Write 100000 bytes at offset 512
@@ -212,7 +251,7 @@ TEST_F(TestConnectorFixture, WriteTest2) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(0, OBJECTSIZE);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 // Write full object of random data
@@ -244,7 +283,7 @@ TEST_F(TestConnectorFixture, WriteTest3) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(0, OBJECTSIZE);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(write_buffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(write_buffer));
 }
 
 // Write at offset 1024 for 327680 bytes (slightly over 2 objects)
@@ -268,7 +307,7 @@ TEST_F(TestConnectorFixture, WriteTestSpanning) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(0, readLength);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 // Do several writes spanning the first 3 objects in random combinations
@@ -313,7 +352,7 @@ TEST_F(TestConnectorFixture, WriteTestRepeatingRMW) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(0, readLength);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuf));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuf));
 }
 
 /******************************
@@ -348,7 +387,7 @@ TEST_F(TestConnectorFixture, WriteSameTestAligned) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(expectBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(expectBuffer));
 }
 
 // Write 2 objects worth of random data
@@ -381,7 +420,7 @@ TEST_F(TestConnectorFixture, WriteSameTestEndAligned) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Write 2 objects worth of random data
@@ -414,7 +453,7 @@ TEST_F(TestConnectorFixture, WriteSameTestStartAligned) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Write 3 objects worth of random data
@@ -447,7 +486,7 @@ TEST_F(TestConnectorFixture, WriteSameTestUnaligned) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Use writeSame to write a few LBAs in the middle of an object
@@ -481,7 +520,7 @@ TEST_F(TestConnectorFixture, WriteSameTestMiddle) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(readOffset, readLength);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Use writeSame to write a few LBAs in the middle of a non existing object
@@ -510,7 +549,7 @@ TEST_F(TestConnectorFixture, WriteSameTestNonExistingObject) {
     auto readTask = new fds::block::ReadTask(&testTask2);
     readTask->set(readOffset, readLength);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(fullBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(fullBuffer));
 }
 
 /******************************
@@ -548,7 +587,7 @@ TEST_F(TestConnectorFixture, UnmapTestAligned) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(expectBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(expectBuffer));
 }
 
 // Write 2 objects worth of random data
@@ -586,7 +625,7 @@ TEST_F(TestConnectorFixture, UnmapTestAligned2) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(expectBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(expectBuffer));
 }
 
 // Write 2 objects worth of random data
@@ -626,7 +665,7 @@ TEST_F(TestConnectorFixture, UnmapTestSpanning) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Write 4 objects worth of random data
@@ -678,7 +717,7 @@ TEST_F(TestConnectorFixture, UnmapTestDualSpanning) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Write 1 object worth of random data
@@ -717,7 +756,7 @@ TEST_F(TestConnectorFixture, UnmapTestStartAligned) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Write 1 object worth of random data
@@ -756,7 +795,7 @@ TEST_F(TestConnectorFixture, UnmapTestEndAligned) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Write 1 object worth of random data
@@ -795,7 +834,7 @@ TEST_F(TestConnectorFixture, UnmapTestMiddle) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
 // Write 1 object worth of random data
@@ -844,12 +883,376 @@ TEST_F(TestConnectorFixture, UnmapTestBothEnds) {
     auto readTask = new fds::block::ReadTask(&testTask3);
     readTask->set(offset, length);
     connectorPtr->executeTask(readTask);
-    EXPECT_TRUE(connectorPtr->verifyBuffers(writeBuffer));
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
+}
+
+// Run basic single write test multithreaded
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTestSimple) {
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask = new TestTask(0);
+    auto writeTask = new fds::block::WriteTask(testTask);
+    auto write_buffer = randomStrGen(64);
+    writeTask->setWriteBuffer(write_buffer);
+    writeTask->set(0, write_buffer->size());
+    connectorPtr->executeTask(writeTask);
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask2 = new TestTask(1);
+    auto readTask = new fds::block::ReadTask(testTask2);
+    readTask->set(0, write_buffer->size());
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffer(write_buffer));
+}
+
+// Do 64 4k writes
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd64_4k) {
+    uint32_t queueDepth = 64;
+    uint32_t writeSize = 4096;
+    uint64_t seqId = 0;
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = queueDepth;
+    }
+
+    auto expectBuffer = std::make_shared<std::string>();
+    std::vector<std::shared_ptr<std::string>> writes;
+    for (uint32_t i = 0; i < queueDepth; ++i) {
+        auto writeBuffer = randomStrGen(writeSize);
+        *expectBuffer += *writeBuffer;
+        writes.push_back(writeBuffer);
+    }
+
+    uint64_t offset = 0;
+    for (auto& w : writes) {
+        auto testTask = new TestTask(seqId++);
+        auto writeTask = new fds::block::WriteTask(testTask);
+        writeTask->setWriteBuffer(w);
+        writeTask->set(offset, w->size());
+        offset += w->size();
+        connectorPtr->executeTask(writeTask);
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask2 = new TestTask(seqId++);
+    auto readTask = new fds::block::ReadTask(testTask2);
+    readTask->set(0, expectBuffer->size());
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffer(expectBuffer));
+}
+
+// Do 4 128k writes
+// Aligned writes
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd4_128k) {
+    uint32_t queueDepth = 4;
+    uint32_t writeSize = OBJECTSIZE;
+    uint64_t seqId = 0;
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = queueDepth;
+    }
+
+    auto expectBuffer = std::make_shared<std::string>();
+    std::vector<std::shared_ptr<std::string>> writes;
+    for (uint32_t i = 0; i < queueDepth; ++i) {
+        auto writeBuffer = randomStrGen(writeSize);
+        *expectBuffer += *writeBuffer;
+        writes.push_back(writeBuffer);
+    }
+
+    uint64_t offset = 0;
+    for (auto& w : writes) {
+        auto testTask = new TestTask(seqId++);
+        auto writeTask = new fds::block::WriteTask(testTask);
+        writeTask->setWriteBuffer(w);
+        writeTask->set(offset, w->size());
+        offset += w->size();
+        connectorPtr->executeTask(writeTask);
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask2 = new TestTask(seqId++);
+    auto readTask = new fds::block::ReadTask(testTask2);
+    readTask->set(0, expectBuffer->size());
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffer(expectBuffer));
+}
+
+// Do 8 163840 byte writes
+// Larger than object size writes
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd8_163840) {
+    uint32_t queueDepth = 8;
+    uint32_t writeSize = 163840;
+    uint64_t seqId = 0;
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = queueDepth;
+    }
+
+    auto expectBuffer = std::make_shared<std::string>();
+    std::vector<std::shared_ptr<std::string>> writes;
+    for (uint32_t i = 0; i < queueDepth; ++i) {
+        auto writeBuffer = randomStrGen(writeSize);
+        *expectBuffer += *writeBuffer;
+        writes.push_back(writeBuffer);
+    }
+
+    uint64_t offset = 0;
+    for (auto& w : writes) {
+        auto testTask = new TestTask(seqId++);
+        auto writeTask = new fds::block::WriteTask(testTask);
+        writeTask->setWriteBuffer(w);
+        writeTask->set(offset, w->size());
+        offset += w->size();
+        connectorPtr->executeTask(writeTask);
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask2 = new TestTask(seqId++);
+    auto readTask = new fds::block::ReadTask(testTask2);
+    readTask->set(0, expectBuffer->size());
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffer(expectBuffer));
+}
+
+// Do 2 8k writes at same offset
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd2_8k_overwrite) {
+    uint32_t queueDepth = 2;
+    uint32_t writeSize = 8192;
+    uint64_t writeOffset = 4096;
+    uint64_t seqId = 0;
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = queueDepth;
+    }
+
+    std::vector<std::shared_ptr<std::string>> writes;
+    for (uint32_t i = 0; i < queueDepth; ++i) {
+        auto writeBuffer = randomStrGen(writeSize);
+        writes.push_back(writeBuffer);
+    }
+
+    for (auto& w : writes) {
+        auto testTask = new TestTask(seqId++);
+        auto writeTask = new fds::block::WriteTask(testTask);
+        writeTask->setWriteBuffer(w);
+        writeTask->set(writeOffset, w->size());
+        connectorPtr->executeTask(writeTask);
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask2 = new TestTask(seqId++);
+    auto readTask = new fds::block::ReadTask(testTask2);
+    readTask->set(writeOffset, writeSize);
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffers(writes));
+}
+
+// Do 2 overlapping
+// |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx----------|
+// |----------OOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
+// expect
+// |xxxxxxxxxxOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
+// or
+// |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxOOOOOOOOOO|
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd2_overlapping) {
+    uint32_t queueDepth = 2;
+    uint32_t writeSize = 98304;
+    uint64_t seqId = 0;
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = queueDepth;
+    }
+
+    auto expectBuffer = std::make_shared<std::string>(OBJECTSIZE, '\0');
+    auto expectBuffer2 = std::make_shared<std::string>(OBJECTSIZE, '\0');
+
+    std::vector<std::shared_ptr<std::string>> bufs;
+    auto writeBuffer = randomStrGen(writeSize);
+    expectBuffer->replace(0, writeSize, *writeBuffer);
+    auto writeBuffer2 = randomStrGen(writeSize);
+    expectBuffer->replace(32768, writeSize, *writeBuffer2);
+    expectBuffer2->replace(32768, writeSize, *writeBuffer2);
+    expectBuffer2->replace(0, writeSize, *writeBuffer);
+    bufs.push_back(expectBuffer);
+    bufs.push_back(expectBuffer2);
+
+    auto testTask = new TestTask(seqId++);
+    auto testTask2 = new TestTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(testTask);
+    auto writeTask2 = new fds::block::WriteTask(testTask2);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask2->setWriteBuffer(writeBuffer2);
+    writeTask->set(0, writeBuffer->size());
+    writeTask2->set(32768, writeBuffer->size());
+    connectorPtr->executeTask(writeTask);
+    connectorPtr->executeTask(writeTask2);
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask3 = new TestTask(seqId++);
+    auto readTask = new fds::block::ReadTask(testTask3);
+    readTask->set(0, OBJECTSIZE);
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffers(bufs));
+}
+
+// Write 128k block, partially overwritten by a smaller 8k block
+// |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|
+// |----------000000------------------------|
+// expect
+// |xxxxxxxxxx000000xxxxxxxxxxxxxxxxxxxxxxxx|
+// or
+// |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd2_overlapping2) {
+    uint32_t queueDepth = 2;
+    uint32_t writeSize = 8192;
+    uint64_t writeOffset = 32768;
+    uint64_t seqId = 0;
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = queueDepth;
+    }
+
+    auto expectBuffer = std::make_shared<std::string>(OBJECTSIZE, '\0');
+
+    std::vector<std::shared_ptr<std::string>> bufs;
+    auto writeBuffer = randomStrGen(OBJECTSIZE);
+    bufs.push_back(writeBuffer);
+    expectBuffer->replace(0, OBJECTSIZE, *writeBuffer);
+    auto writeBuffer2 = randomStrGen(writeSize);
+    expectBuffer->replace(writeOffset, writeSize, *writeBuffer2);
+    bufs.push_back(expectBuffer);
+
+    auto testTask = new TestTask(seqId++);
+    auto testTask2 = new TestTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(testTask);
+    auto writeTask2 = new fds::block::WriteTask(testTask2);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeTask2->setWriteBuffer(writeBuffer2);
+    writeTask->set(0, writeBuffer->size());
+    writeTask2->set(writeOffset, writeBuffer2->size());
+    connectorPtr->executeTask(writeTask);
+    connectorPtr->executeTask(writeTask2);
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask3 = new TestTask(seqId++);
+    auto readTask = new fds::block::ReadTask(testTask3);
+    readTask->set(0, OBJECTSIZE);
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffers(bufs));
 }
 
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
-    uint32_t seed = 1;
+    auto seed = time(NULL);
 
     std::cout << "Seed value: " << seed << std::endl;
 

@@ -185,16 +185,16 @@ BlockOperations::drainUpdateChain
 
     while (update_queued) {
         queued_task = findResponse(queued_handle.handle);
-        LOGTRACE << "handle:" << requestId.handle << " queued:" << queued_task->getProtoTask()->getHandle() << " offset:" << offset << " draining";
         if (queued_task) {
+            LOGTRACE << "handle:" << requestId.handle << " queued:" << queued_task->getProtoTask()->getHandle() << " offset:" << offset << " draining";
             auto writeTask = static_cast<WriteTask*>(queued_task);
             auto new_data = writeTask->getBuffer(queued_handle.seq);
-            if (maxObjectSizeInBytes != new_data->length()) {
-                new_data = writeTask->handleRMWResponse(buf,
-                                                        maxObjectSizeInBytes,
-                                                        queued_handle.seq);
-
-
+            if (nullptr != new_data) {
+                if (maxObjectSizeInBytes > new_data->length()) {
+                    new_data = writeTask->handleRMWResponse(buf,
+                                                            maxObjectSizeInBytes,
+                                                            queued_handle.seq);
+                }
                 buf = new_data;
                 haveNewObject = true;
             }
@@ -399,10 +399,22 @@ void BlockOperations::performWrite
         } else {
            writeTask->keepBufferForWrite(seqId, objectOff, ZERO_OFFSET, objBuf);
            xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
-           auto queueResp = ctx->queue_update(objectOff, reqId, true);
-           ctx->setOffsetObjectBuffer(objectOff, objBuf);
-           ctx->triggerWrite(objectOff);
-           objectsToWrite.emplace(seqId, objBuf);
+           auto queueResp = ctx->queue_update(objectOff, reqId);
+           if (WriteContext::QueueResult::FirstEntry == queueResp) {
+              ctx->setOffsetObjectBuffer(objectOff, objBuf);
+              ctx->triggerWrite(objectOff);
+              objectsToWrite.emplace(seqId, objBuf);
+           } else if (WriteContext::QueueResult::UpdateStable == queueResp) {
+               bool haveNewObject {false};
+               std::shared_ptr<std::string> newBuf;
+               std::tie(haveNewObject, newBuf) = drainUpdateChain(requestId, objectOff);
+
+               if (true == haveNewObject) {
+                   ctx->setOffsetObjectBuffer(objectOff, newBuf);
+                   ctx->triggerWrite(objectOff);
+                   objectsToWrite.emplace(seqId, newBuf);
+               }
+           }
            ++seqId;
         }
         amBytesWritten += iLength;
@@ -681,7 +693,7 @@ void BlockOperations::readObjectResp
         api->writeObject(r, writeReq);
         return;
     } else if (TaskType::READ == task->match(&v)) {
-        std::lock_guard<std::mutex> lg(readObjectsLock);
+        std::unique_lock<std::mutex> l(readObjectsLock);
         auto readTask = static_cast<ReadTask*>(task);
         auto itr = readObjects.find(requestId.handle);
         if (readObjects.end() == itr) {
@@ -698,6 +710,7 @@ void BlockOperations::readObjectResp
         if (true == readTask->haveReadAllObjects()) {
             readTask->handleReadResponse(*(itr->second), empty_buffer);
             readObjects.erase(itr);
+            l.unlock();
             finishResponse(task);
         }
     }
