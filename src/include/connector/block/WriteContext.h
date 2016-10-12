@@ -1,7 +1,7 @@
 /*
- * Tasks.h
+ * WriteContext.h
  *
- * Copyright (c) 2016, Andreas Griesshammer <andreas@formartionds.com>
+ * Copyright (c) 2016, Andreas Griesshammer <andreas@formationds.com>
  * Copyright (c) 2016, Formation Data Systems
  *
  * Permission to use, copy, modify, and/or distribute this software for any

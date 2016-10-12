@@ -1,7 +1,7 @@
 /*
  * BlockOperations.cpp
  *
- * Copyright (c) 2016, Andreas Griesshammer <andreas@formartionds.com>
+ * Copyright (c) 2016, Andreas Griesshammer <andreas@formationds.com>
  * Copyright (c) 2015, Brian Szmyd <szmyd@formationds.com>
  * Copyright (c) 2015-2016, Formation Data Systems
  *
