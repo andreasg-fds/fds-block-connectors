@@ -23,9 +23,15 @@
 
 #include "connector/scst-standalone/ScstConnector.h"
 #include "connector/scst-standalone/ScstTarget.h"
-#include "Log.h"
-//#include "fds-common/fds_config.hpp"
-//#include "fds-common/fds_process.h"
+#include "log/Log.h"
+
+namespace xdi {
+    fds_log* g_fdslog = new fds_log("ScstConnector", LOG_LOCATION, fds_log::normal);
+
+    fds_log* GetLog() {
+        return g_fdslog;
+    }
+} // namespace xdi
 
 namespace fds {
 namespace connector {
@@ -77,7 +83,7 @@ void ScstConnector::targetDone(const std::string target_name) {
         auto it_target_name = target_prefix + target_pair.first->volumeName;
         if (it_target_name == target_name) {
             targets_.erase(target_pair.first);
-            LOGNOTIFY << "vol:" << target_name << " connector removed target";
+            GLOGNOTIFY << "vol:" << target_name << " connector removed target";
             break;
         }
     }
@@ -105,7 +111,7 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
                                             api_));
             it->second->addDevice(volDesc);
         } catch (ScstError& e) {
-            LOGNOTIFY << "vol:" << volDesc
+            GLOGNOTIFY << "vol:" << volDesc
                       << " failed to initialize target which will be blacklisted";
             if (it->second) {
                 it->second->deviceDone(volDesc->volumeName, true);
@@ -123,7 +129,7 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
     // If we already had a target, and it's shutdown...wait for it to complete
     // before trying to apply the apparently new descriptor
     if (!target.enabled()) {
-        LOGNOTIFY << "vol:" << target_name << " waiting for existing target to complete shutdown";
+        GLOGNOTIFY << "vol:" << target_name << " waiting for existing target to complete shutdown";
         return false;
     }
 
@@ -139,7 +145,7 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
     for (auto const& cred : volDesc->incomingCredentials) {
         auto password = cred.password;
         if (minimum_chap_password_len > password.size()) {
-            LOGWARN << "user:" << cred.username
+            GLOGWARN << "user:" << cred.username
                     << " length:" << password.size()
                     << " minlength:" << minimum_chap_password_len
                     << " extending undersized password";
@@ -149,7 +155,7 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
         bool happened;
         std::tie(cred_it, happened) = incoming_credentials.emplace(cred.username, password);
         if (!happened) {
-            LOGWARN << "user:" << cred.username << " duplicate";
+            GLOGWARN << "user:" << cred.username << " duplicate";
         }
     }
 
@@ -159,7 +165,7 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
         auto const& cred = volDesc->outgoingCredentials;
         auto password = cred.password;
         if (minimum_chap_password_len > password.size()) {
-            LOGWARN << "user:" << cred.username
+            GLOGWARN << "user:" << cred.username
                     << " length:" << password.size()
                     << " minlength:" << minimum_chap_password_len
                     << " extending undersized password";
@@ -209,7 +215,7 @@ ScstConnector::discoverTargets() {
         stopping_condition_.wait_for(lk, rediscovery_delay);
     }
     ScstAdmin::toggleDriver(false);
-    LOGNOTIFY << "Shutdown discovery loop";
+    GLOGNOTIFY << "Shutdown discovery loop";
 }
 
 void
@@ -232,7 +238,7 @@ ScstConnector::listAllVolumesResp(xdi::RequestHandle const& requestId, xdi::List
                     for (auto const& target_pair : targets_) {
                         if (target_pair.first->volumeName == vol->volumeName &&
                             target_pair.first->volumeId != vol->volumeId) {
-                            LOGNOTIFY << "Skipping: " << vol->volumeName
+                            GLOGNOTIFY << "Skipping: " << vol->volumeName
                                       << " while: " << target_pair.first << " shutsdown.";
                             removeTarget(target_pair.first);
                             should_add = false;
@@ -241,7 +247,7 @@ ScstConnector::listAllVolumesResp(xdi::RequestHandle const& requestId, xdi::List
                     }
                     if (should_add) {
                         if (addTarget(currVol)) {
-                            LOGNORMAL << "Added: " << vol->volumeName;
+                            GLOGNORMAL << "Added: " << vol->volumeName;
                         }
                     }
                 }

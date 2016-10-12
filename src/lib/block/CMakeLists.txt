@@ -4,3 +4,5 @@ add_library (block
 		BlockTools.cpp
 		Tasks.cpp
 		WriteContext.cpp)
+
+target_link_libraries (block log)

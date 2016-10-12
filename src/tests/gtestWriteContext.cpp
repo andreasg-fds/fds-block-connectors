@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "Log.h"
+#include "log/Log.h"
 #include "connector/block/WriteContext.h"
 
 std::string path("TestBlob");
@@ -290,6 +290,14 @@ TEST(WriteContextTest, FailBlob) {
     EXPECT_TRUE(ctx.failWriteBlobRequest(0, q));
     EXPECT_EQ(0, ctx.getNumPendingBlobs());
 }
+
+namespace xdi {
+    fds_log* g_fdslog = new fds_log("gtestWriteContext", "", fds_log::trace);
+
+    fds_log* GetLog() {
+        return g_fdslog;
+    }
+} // namespace xdi
 
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);

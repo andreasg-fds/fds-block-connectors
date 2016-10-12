@@ -2,7 +2,7 @@
  * Copyright 2016 by Formation Data Systems, Inc.
  */
 #include "connector/block/WriteContext.h"
-#include "Log.h"
+#include "log/Log.h"
 
 namespace fds {
 namespace block {

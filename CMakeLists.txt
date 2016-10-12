@@ -16,6 +16,9 @@ endif(CCACHE_FOUND)
 find_library (LIB_XDI xdi PATHS "${EXTERN_FDS_LIBS}")
 
 # Locate all 3rd party dependencies
+find_library (LIB_BOOSTSYSTEM boost_system PATHS "${EXTERN_FDS_LIBS}")
+find_library (LIB_BOOSTTHREAD boost_thread PATHS "${EXTERN_FDS_LIBS}")
 find_library (LIB_BOOSTLOG boost_log PATHS "${EXTERN_FDS_LIBS}")
+
 
 add_subdirectory (src)

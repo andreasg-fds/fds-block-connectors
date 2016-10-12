@@ -30,7 +30,7 @@
 #include "connector/block/Tasks.h"
 #include "connector/block/BlockOperations.h"
 #include "connector/block/WriteContext.h"
-#include "Log.h"
+#include "log/Log.h"
 
 namespace fds {
 namespace block {
