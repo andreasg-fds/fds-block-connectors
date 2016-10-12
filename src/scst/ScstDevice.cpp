@@ -34,7 +34,7 @@ extern "C" {
 
 #include <ev++.h>
 
-#include "Log.h"
+#include "log/Log.h"
 
 #include "connector/scst-standalone/ScstTarget.h"
 extern "C" {

@@ -1,7 +1,7 @@
 /*
  * BlockOperations.h
  *
- * Copyright (c) 2016, Andreas Griesshammer <andreas@formartionds.com>
+ * Copyright (c) 2016, Andreas Griesshammer <andreas@formationds.com>
  * Copyright (c) 2015, Brian Szmyd <szmyd@formationds.com>
  * Copyright (c) 2015-2016, Formation Data Systems
  *
@@ -33,6 +33,7 @@
 #include "BlockTask.h"
 #include "BlockTools.h"
 #include "xdi/ApiTypes.h"
+#include "log/Log.h"
 
 #define EMPTY_ID "0000000000000000000000000000000000000000"
 
