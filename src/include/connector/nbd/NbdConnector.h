@@ -55,6 +55,8 @@ struct NbdConnector : public xdi::ApiResponseInterface
     volume_ptr lookupVolume(std::string const& volume_name);
 
     void listResp(xdi_handle const& requestId, xdi::ListBlobsResponse const& resp, xdi_error const& e) override {};
+    void readVolumeMetaResp(xdi_handle const& requestId, xdi::VolumeMetadata const& metadata, xdi_error const& e) override { }
+    void writeVolumeMetaResp(xdi_handle const& requestId, xdi_error const& e) override { }
     void readBlobResp(xdi_handle const& requestId, xdi::ReadBlobResponse const& resp, xdi_error const& e) override {};
     void writeBlobResp(xdi_handle const& requestId, xdi::WriteBlobResponse const& resp, xdi_error const& e) override {};
     void upsertBlobMetadataCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};

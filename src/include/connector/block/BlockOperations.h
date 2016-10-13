@@ -91,19 +91,21 @@ class BlockOperations
 
     virtual void respondTask(task_type* response) = 0;
 
-    virtual void listResp(xdi_handle const& requestId, xdi::ListBlobsResponse const& resp, xdi_error const& e) override {};
-    virtual void readBlobResp(xdi_handle const& requestId, xdi::ReadBlobResponse const& resp, xdi_error const& e) override;
-    virtual void writeBlobResp(xdi_handle const& requestId, xdi::WriteBlobResponse const& resp, xdi_error const& e) override;
-    virtual void upsertBlobMetadataCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
-    virtual void upsertBlobObjectCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
-    virtual void readObjectResp(xdi_handle const& requestId, xdi::BufferPtr const& resp, xdi_error const& e) override;
-    virtual void writeObjectResp(xdi_handle const& requestId, xdi::ObjectId const& resp, xdi_error const& e) override;
-    virtual void deleteBlobResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
-    virtual void diffBlobResp(xdi_handle const& requestId, xdi::DiffBlobResponse const& resp, xdi_error const& e) override {};
-    virtual void diffAllBlobsResp(xdi_handle const& requestId, xdi::DiffAllBlobsResponse const& resp, xdi_error const& e) override {};
-    virtual void diffVolumesResp(xdi_handle const& requestId, xdi::DiffVolumesResponse const& resp, xdi_error const& e) override {};
-    virtual void statVolumeResp(xdi_handle const& requestId, xdi::VolumeStatusPtr const& resp, xdi_error const& e) override {};
-    virtual void listAllVolumesResp(xdi_handle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi_error const& e) override {};
+    void listResp(xdi_handle const& requestId, xdi::ListBlobsResponse const& resp, xdi_error const& e) override {};
+    void readVolumeMetaResp(xdi_handle const& requestId, xdi::VolumeMetadata const& metadata, xdi_error const& e) override { }
+    void writeVolumeMetaResp(xdi_handle const& requestId, xdi_error const& e) override { }
+    void readBlobResp(xdi_handle const& requestId, xdi::ReadBlobResponse const& resp, xdi_error const& e) override;
+    void writeBlobResp(xdi_handle const& requestId, xdi::WriteBlobResponse const& resp, xdi_error const& e) override;
+    void upsertBlobMetadataCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
+    void upsertBlobObjectCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
+    void readObjectResp(xdi_handle const& requestId, xdi::BufferPtr const& resp, xdi_error const& e) override;
+    void writeObjectResp(xdi_handle const& requestId, xdi::ObjectId const& resp, xdi_error const& e) override;
+    void deleteBlobResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
+    void diffBlobResp(xdi_handle const& requestId, xdi::DiffBlobResponse const& resp, xdi_error const& e) override {};
+    void diffAllBlobsResp(xdi_handle const& requestId, xdi::DiffAllBlobsResponse const& resp, xdi_error const& e) override {};
+    void diffVolumesResp(xdi_handle const& requestId, xdi::DiffVolumesResponse const& resp, xdi_error const& e) override {};
+    void statVolumeResp(xdi_handle const& requestId, xdi::VolumeStatusPtr const& resp, xdi_error const& e) override {};
+    void listAllVolumesResp(xdi_handle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi_error const& e) override {};
 
   private:
     void finishResponse(task_type* response);
