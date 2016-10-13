@@ -29,6 +29,23 @@ void ApiStub::list(Request const& requestId, ListBlobsRequest const& request) {
     }
 }
 
+void ApiStub::readVolumeMeta(Request const& requestId) {
+    delay();
+    VolumeMetadata resp;
+    ApiErrorCode err = ApiErrorCode::XDI_OK;
+    if (nullptr != requestId.resp) {
+        requestId.resp->readVolumeMetaResp(requestId.id, resp, err);
+    }
+}
+
+void ApiStub::writeVolumeMeta(Request const& requestId, VolumeMetadata const& metadata) {
+    delay();
+    ApiErrorCode err = ApiErrorCode::XDI_OK;
+    if (nullptr != requestId.resp) {
+        requestId.resp->writeVolumeMetaResp(requestId.id, err);
+    }
+}
+
 void ApiStub::readBlob(Request const& requestId, ReadBlobRequest const& request) {
     delay();
     ReadBlobResponse resp;

@@ -12,6 +12,8 @@ public:
     MOCK_METHOD3(statVolumeResp, void(xdi::RequestHandle const& requestId, xdi::VolumeStatusPtr const& resp, xdi::ApiErrorCode const& e));
     MOCK_METHOD3(listAllVolumesResp, void(xdi::RequestHandle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi::ApiErrorCode const& e));
     MOCK_METHOD3(listResp, void(xdi::RequestHandle const& requestId, xdi::ListBlobsResponse const& resp, xdi::ApiErrorCode const& e));
+    MOCK_METHOD3(readVolumeMetaResp, void(xdi::RequestHandle const& requestId, xdi::VolumeMetadata const& resp, xdi::ApiErrorCode const& e));
+    MOCK_METHOD2(writeVolumeMetaResp, void(xdi::RequestHandle const& requestId, xdi::ApiErrorCode const& e));
     MOCK_METHOD3(readBlobResp, void(xdi::RequestHandle const& requestId, xdi::ReadBlobResponse const& resp, xdi::ApiErrorCode const& e));
     MOCK_METHOD3(writeBlobResp, void(xdi::RequestHandle const& requestId, xdi::WriteBlobResponse const& resp, xdi::ApiErrorCode const& e));
     MOCK_METHOD3(upsertBlobMetadataCasResp, void(xdi::RequestHandle const& requestId, bool const& resp, xdi::ApiErrorCode const& e));
