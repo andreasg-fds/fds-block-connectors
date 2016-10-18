@@ -145,17 +145,38 @@ void WriteContext::mergeRanges
     }
 }
 
-bool WriteContext::addReadBlob
+bool WriteContext::isRangeAvailable
+(
+  ObjectOffsetVal const&                 newStart,
+  ObjectOffsetVal const&                 newEnd,
+  BlockTask*                             task
+)
+{
+    auto itr = _pendingBlobWrites.begin();
+    while ((_pendingBlobWrites.end() != itr) && (itr->first <= newEnd)) {
+        auto origStart = itr->first;
+        auto origEnd = itr->first + itr->second.numObjects - 1;
+        if (true == checkForOverlap(newStart, newEnd, origStart, origEnd)) {
+            return false;
+        }
+        ++itr;
+    }
+    return true;
+}
+
+WriteContext::ReadBlobResult WriteContext::addReadBlob
 (
   ObjectOffsetVal const&     startOffset,
   ObjectOffsetVal const&     endOffset,
-  BlockTask*                 task
+  BlockTask*                 task,
+  bool                       reserveRange
 )
 {
-    if (true == checkOverlappingAwaitingBlobWrite(startOffset, endOffset, task)) return false;
+    if (true == checkOverlappingAwaitingBlobWrite(startOffset, endOffset, task)) return ReadBlobResult::PENDING;
+    if ((true == reserveRange) && (false == isRangeAvailable(startOffset, endOffset, task))) return ReadBlobResult::UNAVAILABLE;
     mergeRanges(startOffset, endOffset, task);
 
-    return true;
+    return ReadBlobResult::OK;
 }
 
 // Check to see if this write overlaps with an already pending
@@ -254,7 +275,7 @@ bool WriteContext::getWriteBlobRequest(ObjectOffsetVal const& offset, WriteBlobR
     auto itr = _pendingBlobWrites.begin();
     while (_pendingBlobWrites.end() != itr) {
         if ((offset >= itr->first) && (offset < itr->first + itr->second.numObjects)) {
-            if (0 < itr->second.pendingBlobReads.size()) {
+            if (false ==  itr->second.pendingBlobReads.empty()) {
                 return false;
             }
             req.blob.blobInfo.path = _path;
@@ -299,13 +320,13 @@ bool WriteContext::failWriteBlobRequest(ObjectOffsetVal const& offset, PendingTa
     return false;
 }
 
-WriteContext::QueueResult WriteContext::queue_update(ObjectOffsetVal const& offset, RequestHandle handle, bool fullBlock) {
+WriteContext::QueueResult WriteContext::queue_update(ObjectOffsetVal const& offset, RequestHandle handle) {
    auto b_itr = _pendingBlobWrites.begin();
    while (_pendingBlobWrites.end() != b_itr) {
        if ((offset >= b_itr->first) && (offset < b_itr->first + b_itr->second.numObjects)) {
            auto off_itr = b_itr->second.offsetStatus.find(offset);
            if (b_itr->second.offsetStatus.end() != off_itr) {
-               if ((nullptr == off_itr->second.updateChain) || (true == fullBlock)) {
+               if (nullptr == off_itr->second.updateChain) {
                    off_itr->second.updateChain.reset(new std::queue<RequestHandle>());
                    off_itr->second.hasPendingWrite = true;
                    return QueueResult::FirstEntry;
@@ -354,7 +375,7 @@ void WriteContext::completeBlobWrite(ObjectOffsetVal const& offset, PendingTasks
    auto awaitingItr = _awaitingBlobWrites.begin();
    while (_awaitingBlobWrites.end() != awaitingItr) {
       if ((awaitingItr->first <= offset) && (awaitingItr->first + awaitingItr->second.numObjects > offset)) {
-          queue = std::move(awaitingItr->second.pendingTasks);
+          queue.swap(awaitingItr->second.pendingTasks);
           _awaitingBlobWrites.erase(awaitingItr);
           return;
       }

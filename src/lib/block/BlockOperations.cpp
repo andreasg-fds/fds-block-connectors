@@ -112,6 +112,7 @@ BlockOperations::_executeTask(RWTask* task) {
     task->setNumBlocks(numBlocks);
     task->setStartBlockOffset(blockRange.startBlockOffset);
     xdi_handle reqId{task->getProtoTask()->getHandle(), 0};
+    bool reservedRange {false};
 
     TaskVisitor v;
     auto taskType = task->match(&v);
@@ -124,9 +125,11 @@ BlockOperations::_executeTask(RWTask* task) {
         taskString = "write";
         break;
     case TaskType::WRITESAME:
+        reservedRange = true;
         taskString = "writesame";
         break;
     case TaskType::UNMAPTASK:
+        reservedRange = true;
         taskString = "unmap";
         break;
     default:
@@ -149,11 +152,18 @@ BlockOperations::_executeTask(RWTask* task) {
        readReq.range.startObjectOffset = blockRange.startBlockOffset;
        readReq.range.endObjectOffset = blockRange.endBlockOffset;
        if (TaskType::READ != taskType) {
-           std::lock_guard<std::mutex> lg(drainChainMutex);
+           std::unique_lock<std::mutex> l(drainChainMutex);
 
-           if (false == ctx->addReadBlob(blockRange.startBlockOffset, blockRange.endBlockOffset, task)) {
+           auto result = ctx->addReadBlob(blockRange.startBlockOffset, blockRange.endBlockOffset, task, reservedRange);
+           if (WriteContext::ReadBlobResult::PENDING == result) {
                LOGDEBUG << "handle:" << task->getProtoTask()->getHandle() << " will be restarted";
                // Task will be restarted
+               return;
+           } else if (WriteContext::ReadBlobResult::UNAVAILABLE == result) {
+               LOGDEBUG << "handle:" << task->getProtoTask()->getHandle() << " offset range unavailable";
+               l.unlock();
+               task->getProtoTask()->setError(ApiErrorCode::XDI_SERVICE_NOT_READY);
+               finishResponse(task);
                return;
            }
        }
@@ -482,9 +492,14 @@ void BlockOperations::performWriteSame
         xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
         for (unsigned int o = 0; o < newOffset.numFullBlocks; ++o) {
             auto currentOffset = newOffset.fullStartBlockOffset + o;
-            auto queueResp = ctx->queue_update(currentOffset, reqId, true);
-            ctx->setOffsetObjectBuffer(currentOffset, writeBuf);
-            ctx->triggerWrite(currentOffset);
+            auto queueResp = ctx->queue_update(currentOffset, reqId);
+            if (WriteContext::QueueResult::FirstEntry == queueResp) {
+                ctx->setOffsetObjectBuffer(currentOffset, writeBuf);
+                ctx->triggerWrite(currentOffset);
+            } else {
+                LOGERROR << "handle:" << requestId.handle << " requires exclusive access to range";
+                return;
+            }
         }
         objectsToWrite.emplace(seqId, writeBuf);
         seqId++;
@@ -575,7 +590,11 @@ void BlockOperations::performUnmap
         unmapTask->setRepeatingBlock(seqId);
         xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
         for (auto const& o : fullObjects) {
-            auto queueResp = ctx->queue_update(o, reqId, true);
+            auto queueResp = ctx->queue_update(o, reqId);
+            if (WriteContext::QueueResult::FirstEntry != queueResp) {
+               LOGERROR << "handle:" << requestId.handle << " requires exclusive access to range";
+               return;
+            }
             ctx->setOffsetObjectBuffer(o, writeBuf);
             ctx->triggerWrite(o);
         }
