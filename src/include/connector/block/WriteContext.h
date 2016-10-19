@@ -41,13 +41,14 @@ class WriteContext {
 
 public:
     enum class QueueResult { FirstEntry, AddedEntry, UpdateStable, Failure };
+    enum class ReadBlobResult { OK, PENDING, UNAVAILABLE };
 
     using PendingTasks = std::queue<BlockTask*>;
     WriteContext(VolumeId volId, std::string& name, uint32_t size);
     ~WriteContext();
 
     bool addPendingWrite(ObjectOffsetVal const& newStart, ObjectOffsetVal const& newEnd, BlockTask* task);
-    bool addReadBlob(ObjectOffsetVal const& startOffset, ObjectOffsetVal const& endOffset, BlockTask* task);
+    ReadBlobResult addReadBlob(ObjectOffsetVal const& startOffset, ObjectOffsetVal const& endOffset, BlockTask* task, bool reserveRange);
 
     bool getWriteBlobRequest(ObjectOffsetVal const& offset, WriteBlobRequest& req, PendingTasks& queue);
     bool failWriteBlobRequest(ObjectOffsetVal const& offset, PendingTasks& queue);
@@ -55,7 +56,7 @@ public:
 
     int getNumPendingBlobs() { return _pendingBlobWrites.size(); };
 
-    QueueResult queue_update(ObjectOffsetVal const& offset, RequestHandle handle, bool fullBlock = false);
+    QueueResult queue_update(ObjectOffsetVal const& offset, RequestHandle handle);
     std::pair<bool, RequestHandle> pop(ObjectOffsetVal const& offset);
 
     void completeBlobWrite(ObjectOffsetVal const& offset, PendingTasks& queue);
@@ -145,6 +146,13 @@ private:
     );
 
     void mergeRanges
+    (
+      ObjectOffsetVal const&      newStart,
+      ObjectOffsetVal const&      newEnd,
+      BlockTask*                  task
+    );
+
+    bool isRangeAvailable
     (
       ObjectOffsetVal const&      newStart,
       ObjectOffsetVal const&      newEnd,

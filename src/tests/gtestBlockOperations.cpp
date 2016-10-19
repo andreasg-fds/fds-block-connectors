@@ -1270,6 +1270,55 @@ TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd2_overlapping2) {
     EXPECT_TRUE(connectorPtr->verifyBuffers(bufs));
 }
 
+// Single write that spans 3 objects
+// WriteSame that overwrites object in the middle
+TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd2_write_overlapping_writeSame) {
+    uint32_t queueDepth = 2;
+    uint32_t writeSize = 3 * OBJECTSIZE;
+    uint64_t writeOffset = 0;
+    uint64_t seqId = 0;
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = queueDepth;
+    }
+
+    auto lbaBuffer = randomStrGen(LBASIZE);
+
+    auto writeBuffer = randomStrGen(writeSize);
+    auto testTask = new TestTask(seqId++);
+    auto testTask2 = new TestTask(seqId++);
+    auto writeTask = new fds::block::WriteTask(testTask);
+    auto writeSameTask = new fds::block::WriteSameTask(testTask2);
+    writeTask->setWriteBuffer(writeBuffer);
+    writeSameTask->setWriteBuffer(lbaBuffer);
+    writeTask->set(writeOffset, writeBuffer->size());
+    writeSameTask->set(OBJECTSIZE, OBJECTSIZE);
+    connectorPtr->executeTask(writeTask);
+    connectorPtr->executeTask(writeSameTask);
+
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(mutex);
+        count = 0;
+        expected = 1;
+    }
+
+    auto testTask3 = new TestTask(seqId++);
+    auto readTask = new fds::block::ReadTask(testTask3);
+    readTask->set(0, 3 * OBJECTSIZE);
+    connectorPtr->executeTask(readTask);
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        EXPECT_TRUE(cond_var.wait_for(lock, std::chrono::seconds(5), [&] { return count == expected; }));
+    }
+    EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
+}
+
 namespace xdi {
     fds_log* g_fdslog = new fds_log("gtestBlockOperations", "", fds_log::trace);
 
