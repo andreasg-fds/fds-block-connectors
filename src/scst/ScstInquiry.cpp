@@ -24,13 +24,6 @@ namespace fds {
 namespace connector {
 namespace scst {
 
-static size_t setString(void* buffer, std::string const & str, size_t const buf_max)
-{
-    auto to_copy = std::min(str.size(), buf_max);
-    std::memcpy(buffer, str.data(), to_copy);
-    return to_copy;
-}
-
 static void setPaddedString(void* buffer, std::string const & str, size_t const buf_max)
 {
     auto to_copy = buf_max;

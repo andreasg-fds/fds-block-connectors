@@ -299,7 +299,7 @@ NbdConnector::discoverTargets() {
 }
 
 void
-NbdConnector::listAllVolumesResp(xdi::RequestHandle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi::ApiErrorCode const& e) {
+NbdConnector::listAllVolumesResp(xdi::RequestHandle const&, xdi::ListAllVolumesResponse const& resp, xdi::ApiErrorCode const& e) {
     if (xdi::ApiErrorCode::XDI_OK == e) {
         std::lock_guard<std::mutex> g(connection_lock);
         volume_id_map.clear();

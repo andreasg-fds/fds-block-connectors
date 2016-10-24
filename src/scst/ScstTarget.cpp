@@ -210,7 +210,7 @@ ScstTarget::startNewDevices() {
 }
 
 void
-ScstTarget::wakeupCb(ev::async &watcher, int revents) {
+ScstTarget::wakeupCb(ev::async&, int) {
     if (enabled()) {
         startNewDevices();
     }

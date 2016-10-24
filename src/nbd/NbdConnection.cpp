@@ -101,17 +101,17 @@ NbdConnection::NbdConnection(NbdConnector* server,
                              int clientsd,
                              std::shared_ptr<xdi::ApiInterface> api)
         : fds::block::BlockOperations(api),
-          nbd_server(server),
           clientSocket(clientsd),
           volume_size{0},
           object_size{0},
-          nbd_state(NbdProtoState::PREINIT),
+          nbd_server(server),
           handshake({ { 0x01u },  0x00ull, 0x00ull, nullptr }),
           response(nullptr),
           total_blocks(0ull),
           write_offset(-1ll),
           readyResponses(4000),
-          current_response(nullptr)
+          current_response(nullptr),
+          nbd_state(NbdProtoState::PREINIT)
 {
     memset(&attach, '\0', sizeof(attach));
     memset(&request, '\0', sizeof(request));
@@ -200,7 +200,7 @@ NbdConnection::write_response() {
 }
 
 // Send initial message to client with NBD magic and proto version
-bool NbdConnection::handshake_start(ev::io &watcher) {
+bool NbdConnection::handshake_start(ev::io&) {
     // Vector always starts from this state
     static iovec const vectors[] = {
         { to_iovec(NBD_MAGIC_PWD),       sizeof(NBD_MAGIC_PWD)      },
@@ -271,7 +271,7 @@ void NbdConnection::option_request(ev::io &watcher) {
 }
 
 bool
-NbdConnection::option_reply(ev::io &watcher) {
+NbdConnection::option_reply(ev::io&) {
     static char const zeros[124]{0};  // NOLINT
     static int16_t const optFlags =
         ntohs(NBD_FLAG_HAS_FLAGS);
@@ -344,7 +344,7 @@ bool NbdConnection::io_request(ev::io &watcher) {
 }
 
 bool
-NbdConnection::io_reply(ev::io &watcher) {
+NbdConnection::io_reply(ev::io&) {
     static int32_t const error_ok = htonl(0);
     static int32_t const error_bad = htonl(-1);
 
@@ -439,7 +439,7 @@ NbdConnection::dispatchOp() {
 }
 
 void
-NbdConnection::wakeupCb(ev::async &watcher, int revents) {
+NbdConnection::wakeupCb(ev::async&, int) {
     if (stopping) {
         shutdown();
     }

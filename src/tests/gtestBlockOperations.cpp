@@ -58,7 +58,6 @@ public:
     }
 
     void respondTask(fds::block::BlockTask* response) override {
-        auto task = static_cast<TestTask*>(response->getProtoTask());
         fds::block::TaskVisitor v;
         if (fds::block::TaskType::READ == response->match(&v)) {
             auto btask = static_cast<fds::block::ReadTask *>(response);

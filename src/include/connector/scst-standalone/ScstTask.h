@@ -80,10 +80,10 @@ struct ScstTask : public fds::block::ProtoTask {
 
   private:
     // Task response to SCST
-    scst_user_reply_cmd reply {};
+    scst_user_reply_cmd reply;
 
     // LBA remap identifier
-    scst_user_ext_copy_data_descr remap_desc {};
+    scst_user_ext_copy_data_descr remap_desc;
 
     // Sense buffer for check conditions
     uint8_t sense_buffer[18] {};
