@@ -44,10 +44,10 @@ struct UnmapTask;
 enum class TaskType { READ, WRITE, WRITESAME, UNMAPTASK };
 
 struct TaskVisitor {
-    virtual TaskType matchRead(ReadTask* arg) const { return TaskType::READ; }
-    virtual TaskType matchWrite(WriteTask* arg) const { return TaskType::WRITE; }
-    virtual TaskType matchWriteSame(WriteSameTask* arg) const { return TaskType::WRITESAME; }
-    virtual TaskType matchUnmap(UnmapTask* arg) const { return TaskType::UNMAPTASK; }
+    virtual TaskType matchRead(ReadTask*) const { return TaskType::READ; }
+    virtual TaskType matchWrite(WriteTask*) const { return TaskType::WRITE; }
+    virtual TaskType matchWriteSame(WriteSameTask*) const { return TaskType::WRITESAME; }
+    virtual TaskType matchUnmap(UnmapTask*) const { return TaskType::UNMAPTASK; }
 };
 
 /**

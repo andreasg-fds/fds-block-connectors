@@ -219,7 +219,9 @@ ScstConnector::discoverTargets() {
 }
 
 void
-ScstConnector::listAllVolumesResp(xdi::RequestHandle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi::ApiErrorCode const& e) {
+ScstConnector::listAllVolumesResp(xdi::RequestHandle const&,
+                                  xdi::ListAllVolumesResponse const& resp,
+                                  xdi::ApiErrorCode const& e) {
     {
         std::lock_guard<std::mutex> lk(target_lock_);
         getting_list = false;

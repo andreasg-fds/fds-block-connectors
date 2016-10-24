@@ -35,7 +35,7 @@ void ApiStub::delay() {
     std::this_thread::sleep_for(std::chrono::milliseconds(_delay));
 }
 
-void ApiStub::list(Request const& requestId, ListBlobsRequest const& request) {
+void ApiStub::list(Request const& requestId, ListBlobsRequest const&) {
     delay();
     ListBlobsResponse resp;
     ApiErrorCode err = ApiErrorCode::XDI_OK;
@@ -44,7 +44,7 @@ void ApiStub::list(Request const& requestId, ListBlobsRequest const& request) {
     }
 }
 
-void ApiStub::readVolumeMeta(Request const& requestId) {
+void ApiStub::readVolumeMeta(Request const& requestId, VolumeId const) {
     delay();
     VolumeMetadata resp;
     ApiErrorCode err = ApiErrorCode::XDI_OK;
@@ -53,11 +53,11 @@ void ApiStub::readVolumeMeta(Request const& requestId) {
     }
 }
 
-void ApiStub::writeVolumeMeta(Request const& requestId, VolumeMetadata const& metadata) {
+void ApiStub::writeVolumeMeta(Request const& requestId, WriteMetadataRequest const&) {
     delay();
     ApiErrorCode err = ApiErrorCode::XDI_OK;
     if (nullptr != requestId.resp) {
-        requestId.resp->writeVolumeMetaResp(requestId.id, err);
+        requestId.resp->writeVolumeMetaResp(requestId.id, true, err);
     }
 }
 
@@ -79,7 +79,7 @@ void ApiStub::writeBlob(Request const& requestId, WriteBlobRequest const& reques
     }
 }
 
-void ApiStub::upsertBlobMetadataCas(Request const& requestId, UpsertBlobMetadataCasRequest const& request) {
+void ApiStub::upsertBlobMetadataCas(Request const& requestId, UpsertBlobMetadataCasRequest const&) {
     delay();
     bool resp {true};
     ApiErrorCode err = ApiErrorCode::XDI_OK;
@@ -122,7 +122,7 @@ void ApiStub::deleteBlob(Request const& requestId, BlobPath const& target) {
     }
 }
 
-void ApiStub::diffBlob(Request const& requestId, DiffBlobRequest const& request) {
+void ApiStub::diffBlob(Request const& requestId, DiffBlobRequest const&) {
     delay();
     DiffBlobResponse resp;
     ApiErrorCode err = ApiErrorCode::XDI_OK;
@@ -131,7 +131,7 @@ void ApiStub::diffBlob(Request const& requestId, DiffBlobRequest const& request)
     }
 }
 
-void ApiStub::diffAllBlobs(Request const& requestId, DiffAllBlobsRequest const& request) {
+void ApiStub::diffAllBlobs(Request const& requestId, DiffAllBlobsRequest const&) {
     delay();
     DiffAllBlobsResponse resp;
     ApiErrorCode err = ApiErrorCode::XDI_OK;
@@ -140,7 +140,7 @@ void ApiStub::diffAllBlobs(Request const& requestId, DiffAllBlobsRequest const& 
     }
 }
 
-void ApiStub::diffVolumes(Request const& requestId, DiffVolumesRequest const& request) {
+void ApiStub::diffVolumes(Request const& requestId, DiffVolumesRequest const&) {
     delay();
     DiffVolumesResponse resp;
     ApiErrorCode err = ApiErrorCode::XDI_OK;
@@ -149,7 +149,7 @@ void ApiStub::diffVolumes(Request const& requestId, DiffVolumesRequest const& re
     }
 }
 
-void ApiStub::statVolume(Request const& requestId, VolumeId const volumeId) {
+void ApiStub::statVolume(Request const& requestId, VolumeId const) {
     auto resp = std::make_shared<VolumeStatus>();
     ApiErrorCode err = ApiErrorCode::XDI_OK;
     if (nullptr != requestId.resp) {
@@ -157,7 +157,7 @@ void ApiStub::statVolume(Request const& requestId, VolumeId const volumeId) {
     }
 }
 
-void ApiStub::listAllVolumes(Request const& requestId, ListAllVolumesRequest const& request) {
+void ApiStub::listAllVolumes(Request const& requestId, ListAllVolumesRequest const&) {
     std::cout << "ListAllVolumes" << std::endl;
     ListAllVolumesResponse resp;
     ApiErrorCode err = ApiErrorCode::XDI_OK;

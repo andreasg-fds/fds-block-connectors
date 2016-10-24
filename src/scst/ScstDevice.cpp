@@ -64,11 +64,11 @@ namespace scst {
 
 ScstDevice::ScstDevice(std::string const&  device_name,
                        ScstTarget*        target)
-        : scst_target(target),
-          volumeName(device_name),
-          readyResponses(4000),
+        : readyResponses(4000),
           inquiry_handler(new InquiryHandler()),
-          mode_handler(new ModeHandler())
+          mode_handler(new ModeHandler()),
+          volumeName(device_name),
+          scst_target(target)
 { }
 
 void ScstDevice::registerDevice(uint8_t const device_type, uint32_t const logical_block_size) {
@@ -218,7 +218,7 @@ ScstDevice::openScst() {
 }
 
 void
-ScstDevice::wakeupCb(ev::async &watcher, int revents) {
+ScstDevice::wakeupCb(ev::async&, int) {
     if (stopping) {
         shutdown();
         asyncWatcher->stop();
@@ -538,7 +538,7 @@ ScstDevice::getAndRespond() {
 }
 
 void
-ScstDevice::ioEvent(ev::io &watcher, int revents) {
+ScstDevice::ioEvent(ev::io&, int revents) {
     if (EV_ERROR & revents) {
         GLOGERROR << "Got invalid libev event";
         return;

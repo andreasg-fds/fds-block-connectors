@@ -47,10 +47,10 @@ static const uint32_t ZERO_OFFSET = 0;
 
 BlockOperations::BlockOperations(std::shared_ptr<ApiInterface> interface)
         : volumeName(nullptr),
-          domainName(new std::string("TestDomain")),
           blobName(new std::string("BlockBlob")),
-          emptyMeta(new std::map<std::string, std::string>()),
+          domainName(new std::string("TestDomain")),
           blobMode(new int32_t(0)),
+          emptyMeta(new std::map<std::string, std::string>()),
           api(interface)
 {
 }
@@ -83,8 +83,6 @@ BlockOperations::detachVolume() {
         auto it = assoc_map.find(*volumeName);
         if (assoc_map.end() != it) {
             if (0 == --it->second) {
-                xdi_handle reqId{0, 0};
-                //return xdiAsyncDataApi->detachVolume(reqId, volumeId);
                 assoc_map.erase(it);
             }
         }
@@ -202,7 +200,6 @@ BlockOperations::drainUpdateChain
             if (nullptr != new_data) {
                 if (maxObjectSizeInBytes > new_data->length()) {
                     new_data = writeTask->handleRMWResponse(buf,
-                                                            maxObjectSizeInBytes,
                                                             queued_handle.seq);
                 }
                 buf = new_data;
@@ -261,7 +258,6 @@ BlockTask* BlockOperations::findResponse
 }
 
 void BlockOperations::enqueueOperations(BlockTask* task, read_map const& r, write_map const& w) {
-    auto rwTask = static_cast<RWTask*>(task);
     for (auto& o_read : r) {
         auto readSeqId = o_read.first;
         xdi_handle reqId{task->getProtoTask()->getHandle(), readSeqId};
@@ -276,7 +272,6 @@ void BlockOperations::enqueueOperations(BlockTask* task, read_map const& r, writ
         writeReq.buffer = o_write.second;
         writeReq.volId = volumeId;
         auto writeSeqId = o_write.first;
-        auto writeOffset = rwTask->getOffset(writeSeqId);
         xdi_handle reqId{task->getProtoTask()->getHandle(), writeSeqId};
         Request r{reqId, RequestType::WRITE_OBJECT_TYPE, this};
         api->writeObject(r, writeReq);
@@ -453,7 +448,6 @@ void BlockOperations::performWriteSame
     auto writeTask = static_cast<WriteSameTask*>(task);
     auto length = writeTask->getLength();
     auto offset = writeTask->getOffset();
-    auto end = offset + length - 1;
     auto isNewBlob = (ApiErrorCode::XDI_MISSING_BLOB == e);
     writeTask->setObjectCount(writeTask->getNumBlocks());
 
@@ -646,7 +640,7 @@ void BlockOperations::queuePartialWrite
 void BlockOperations::writeBlobResp
 (
   RequestHandle const&           requestId,
-  WriteBlobResponse const&       resp,
+  WriteBlobResponse const&,
   ApiErrorCode const&            e
 )
 {
@@ -690,7 +684,7 @@ void BlockOperations::readObjectResp
         (TaskType::UNMAPTASK == task->match(&v)))  {
         auto writeTask = static_cast<WriteTask*>(task);
         auto offset = writeTask->getOffset(requestId.seq);
-        auto new_data = writeTask->handleRMWResponse(resp, maxObjectSizeInBytes, requestId.seq);
+        auto new_data = writeTask->handleRMWResponse(resp, requestId.seq);
         bool haveNewObject {false};
         std::shared_ptr<std::string> newBuf;
         WriteObjectRequest writeReq;

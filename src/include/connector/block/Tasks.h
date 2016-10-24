@@ -120,9 +120,7 @@ struct WriteTask : public RWTask {
      * \return true if all responses were received or operation error
      */
     buffer_ptr_type
-        handleRMWResponse(buffer_ptr_type const& retBuf,
-                          uint32_t len,
-                          sequence_type seqId);
+        handleRMWResponse(buffer_ptr_type const& retBuf, sequence_type seqId);
 
 private:
     std::shared_ptr<std::string>  writeBuffer;

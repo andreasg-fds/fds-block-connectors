@@ -148,8 +148,7 @@ void WriteContext::mergeRanges
 bool WriteContext::isRangeAvailable
 (
   ObjectOffsetVal const&                 newStart,
-  ObjectOffsetVal const&                 newEnd,
-  BlockTask*                             task
+  ObjectOffsetVal const&                 newEnd
 )
 {
     auto itr = _pendingBlobWrites.begin();
@@ -173,7 +172,7 @@ WriteContext::ReadBlobResult WriteContext::addReadBlob
 )
 {
     if (true == checkOverlappingAwaitingBlobWrite(startOffset, endOffset, task)) return ReadBlobResult::PENDING;
-    if ((true == reserveRange) && (false == isRangeAvailable(startOffset, endOffset, task))) return ReadBlobResult::UNAVAILABLE;
+    if ((true == reserveRange) && (false == isRangeAvailable(startOffset, endOffset))) return ReadBlobResult::UNAVAILABLE;
     mergeRanges(startOffset, endOffset, task);
 
     return ReadBlobResult::OK;

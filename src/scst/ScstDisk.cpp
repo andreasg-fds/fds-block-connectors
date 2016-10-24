@@ -309,6 +309,7 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
             auto unmap_data_length = be16toh(*(uint16_t*)(buffer));
             auto unmap_block_descriptor_data_length = be16toh(*(uint16_t*)(buffer + 2));
             GLOGIO << "unmap:" << listLength
+                   << " anchored:" << anchored
                    << " unmapdatalength:" << unmap_data_length
                    << " unmapblockdescriptordatalength:" << unmap_block_descriptor_data_length;
             fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);

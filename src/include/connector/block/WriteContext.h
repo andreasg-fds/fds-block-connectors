@@ -155,8 +155,7 @@ private:
     bool isRangeAvailable
     (
       ObjectOffsetVal const&      newStart,
-      ObjectOffsetVal const&      newEnd,
-      BlockTask*                  task
+      ObjectOffsetVal const&      newEnd
     );
 
 };

@@ -63,7 +63,7 @@ static std::string scst_iscsi_host_mgmt      { "mgmt" };
 static constexpr uint32_t max_luns = 256u;
 
 // Map of luns in the Copy manager
-static std::array<std::string, max_luns> copy_lun_map { };
+static std::array<std::string, max_luns> copy_lun_map;
 static std::mutex copy_lun_lock;
 
 static ssize_t nextCopyLUN(std::string const& device_name) {
@@ -88,7 +88,7 @@ static void removeFromCopy(std::string const& device_name) {
 static ScstAdmin::credential_map
 currentUsers(std::string const& path) {
     ScstAdmin::credential_map current_users;
-    glob_t glob_buf {};
+    glob_t glob_buf;
     auto res = glob(path.c_str(), GLOB_ERR, nullptr, &glob_buf);
     if (0 == res) {
         auto user = glob_buf.gl_pathv;
@@ -224,7 +224,7 @@ ScstAdmin::currentOutgoingUsers(std::string const& target_name) {
 void
 ScstAdmin::currentInitiators(std::string const& target_name, initiator_set& current_set) {
     current_set.clear();
-    glob_t glob_buf {};
+    glob_t glob_buf;
     auto pattern = scst_iscsi_target_path + target_name + scst_iscsi_ini_path + scst_secure_group_name + scst_iscsi_host_mgmt_path + "*";
     auto res = glob(pattern.c_str(), GLOB_ERR, nullptr, &glob_buf);
     if (0 == res) {
@@ -499,7 +499,7 @@ bool ScstAdmin::applyMasking(std::string const& target_name, initiator_set const
  */
 void ScstAdmin::removeInitiators(std::string const& target_name) {
     GLOGDEBUG << "target:" << target_name << " closing active sessions";
-    glob_t glob_buf {};
+    glob_t glob_buf;
     auto pattern = scst_iscsi_target_path + target_name + "/sessions/*/force_close";
     auto res = glob(pattern.c_str(), GLOB_ERR, nullptr, &glob_buf);
     if (0 == res) {

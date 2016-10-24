@@ -54,21 +54,21 @@ struct NbdConnector : public xdi::ApiResponseInterface
     void deviceDone(int const socket);
     volume_ptr lookupVolume(std::string const& volume_name);
 
-    void listResp(xdi_handle const& requestId, xdi::ListBlobsResponse const& resp, xdi_error const& e) override {};
-    void readVolumeMetaResp(xdi_handle const& requestId, xdi::VolumeMetadata const& metadata, xdi_error const& e) override { }
-    void writeVolumeMetaResp(xdi_handle const& requestId, xdi_error const& e) override { }
-    void readBlobResp(xdi_handle const& requestId, xdi::ReadBlobResponse const& resp, xdi_error const& e) override {};
-    void writeBlobResp(xdi_handle const& requestId, xdi::WriteBlobResponse const& resp, xdi_error const& e) override {};
-    void upsertBlobMetadataCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
-    void upsertBlobObjectCasResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
-    void readObjectResp(xdi_handle const& requestId, xdi::BufferPtr const& resp, xdi_error const& e) override {};
-    void writeObjectResp(xdi_handle const& requestId, xdi::ObjectId const& resp, xdi_error const& e) override {};
-    void deleteBlobResp(xdi_handle const& requestId, bool const& resp, xdi_error const& e) override {};
-    void diffBlobResp(xdi_handle const& requestId, xdi::DiffBlobResponse const& resp, xdi_error const& e) override {};
-    void diffAllBlobsResp(xdi_handle const& requestId, xdi::DiffAllBlobsResponse const& resp, xdi_error const& e) override {};
-    void diffVolumesResp(xdi_handle const& requestId, xdi::DiffVolumesResponse const& resp, xdi_error const& e) override {};
-    void statVolumeResp(xdi_handle const& requestId, xdi::VolumeStatusPtr const& resp, xdi_error const& e) override {};
     void listAllVolumesResp(xdi_handle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi_error const& e) override;
+    void listResp(xdi_handle const&, xdi::ListBlobsResponse const&, xdi_error const&) override {};
+    void readVolumeMetaResp(xdi_handle const&, xdi::VolumeMetadata const&, xdi_error const&) override { }
+    void writeVolumeMetaResp(xdi_handle const&, bool const&, xdi_error const&) override {}
+    void readBlobResp(xdi_handle const&, xdi::ReadBlobResponse const&, xdi_error const&) override {};
+    void writeBlobResp(xdi_handle const&, xdi::WriteBlobResponse const&, xdi_error const&) override {};
+    void upsertBlobMetadataCasResp(xdi_handle const&, bool const&, xdi_error const&) override {};
+    void upsertBlobObjectCasResp(xdi_handle const&, bool const&, xdi_error const&) override {};
+    void readObjectResp(xdi_handle const&, xdi::BufferPtr const&, xdi_error const&) override {};
+    void writeObjectResp(xdi_handle const&, xdi::ObjectId const&, xdi_error const&) override {};
+    void deleteBlobResp(xdi_handle const&, bool const&, xdi_error const&) override {};
+    void diffBlobResp(xdi_handle const&, xdi::DiffBlobResponse const&, xdi_error const&) override {};
+    void diffAllBlobsResp(xdi_handle const&, xdi::DiffAllBlobsResponse const&, xdi_error const&) override {};
+    void diffVolumesResp(xdi_handle const&, xdi::DiffVolumesResponse const&, xdi_error const&) override {};
+    void statVolumeResp(xdi_handle const&, xdi::VolumeStatusPtr const&, xdi_error const&) override {};
 
  protected:
     void lead();

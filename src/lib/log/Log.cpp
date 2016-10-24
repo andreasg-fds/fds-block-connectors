@@ -69,8 +69,9 @@ __TRACER__::~__TRACER__() {
 #define MAX_DIR_SIZE 1024 * 1024 * 1024 * (uint64_t)20
 #endif
 
-
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 BOOST_LOG_ATTRIBUTE_KEYWORD(process_name, "ProcessName", std::string)
+#pragma GCC diagnostic pop
 
 /*
  * The formatting logic for the severity level
@@ -139,13 +140,13 @@ fds_log::severity_level fds_log::getLevelFromName(std::string level) {
 
 void fds_log::init(const std::string& logfile,
                    const std::string& logloc,
-                   bool timestamp,
-                   bool severity,
+                   bool,
+                   bool,
                    severity_level level,
-                   bool Pname,
-                   bool Pid,
-                   bool Tid,
-                   bool Record) {
+                   bool,
+                   bool,
+                   bool,
+                   bool) {
     /*
      * Create the with file name and rotation.
      */

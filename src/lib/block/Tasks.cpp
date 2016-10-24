@@ -69,8 +69,7 @@ ReadTask::handleReadResponse(std::vector<std::shared_ptr<std::string>>& buffers,
 
 std::shared_ptr<std::string>
 WriteTask::handleRMWResponse(std::shared_ptr<std::string> const& retBuf,
-                                 uint32_t len,
-                                 sequence_type seqId) {
+                             sequence_type seqId) {
 
     auto w_itr = writeOffsetInBlockMap.find(seqId);
     uint32_t iOff = (w_itr != writeOffsetInBlockMap.end()) ? w_itr->second % maxObjectSizeInBytes : 0;
