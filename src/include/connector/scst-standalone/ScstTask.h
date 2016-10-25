@@ -79,11 +79,13 @@ struct ScstTask : public fds::block::ProtoTask {
     uint32_t getSubcode() const { return reply.subcode; }
 
   private:
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
     // Task response to SCST
-    scst_user_reply_cmd reply;
+    scst_user_reply_cmd reply {};
 
     // LBA remap identifier
-    scst_user_ext_copy_data_descr remap_desc;
+    scst_user_ext_copy_data_descr remap_desc {};
+#pragma GCC diagnostic pop
 
     // Sense buffer for check conditions
     uint8_t sense_buffer[18] {};
