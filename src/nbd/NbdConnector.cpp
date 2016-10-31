@@ -248,12 +248,6 @@ NbdConnector::nbdAcceptCb(ev::io &watcher, int revents) {
 
 int
 NbdConnector::createNbdSocket() {
-    sockaddr_in serv_addr;
-    memset(&serv_addr, '0', sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(nbdPort);
-
     int listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd < 0) {
         GLOGERROR << "failed to create NBD socket";
@@ -266,12 +260,24 @@ NbdConnector::createNbdSocket() {
         GLOGWARN << "failed to set REUSEADDR on NBD socket";
     }
 
-    if (bind(listenfd,
-             (sockaddr*)&serv_addr,
-             sizeof(serv_addr)) == 0) {
-        fcntl(listenfd, F_SETFL, fcntl(listenfd, F_GETFL, 0) | O_NONBLOCK);
-        listen(listenfd, 10);
-    } else {
+    auto tryPort = nbdPort;
+    for (; nbdPort + 4 > tryPort; ++tryPort) {
+        sockaddr_in serv_addr;
+        memset(&serv_addr, '0', sizeof(serv_addr));
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        serv_addr.sin_port = htons(tryPort);
+
+        if (bind(listenfd,
+                 (sockaddr*)&serv_addr,
+                 sizeof(serv_addr)) == 0) {
+            fcntl(listenfd, F_SETFL, fcntl(listenfd, F_GETFL, 0) | O_NONBLOCK);
+            listen(listenfd, 10);
+            nbdPort = tryPort;
+            break;
+        }
+    }
+    if (nbdPort != tryPort) {
         GLOGERROR << "bind to listening socket failed:" << strerror(errno);
         listenfd = -1;
     }
