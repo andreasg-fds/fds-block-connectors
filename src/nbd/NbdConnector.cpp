@@ -261,7 +261,7 @@ NbdConnector::createNbdSocket() {
     }
 
     auto tryPort = nbdPort;
-    for (; nbdPort + 4 > tryPort; ++tryPort) {
+    for (; nbdPort + 400 > tryPort; tryPort += 100) {
         sockaddr_in serv_addr;
         memset(&serv_addr, '0', sizeof(serv_addr));
         serv_addr.sin_family = AF_INET;
@@ -276,9 +276,10 @@ NbdConnector::createNbdSocket() {
             nbdPort = tryPort;
             break;
         }
+        GLOGWARN << "bind to listening socket failed:" << strerror(errno);
     }
     if (nbdPort != tryPort) {
-        GLOGERROR << "bind to listening socket failed:" << strerror(errno);
+        GLOGERROR << "binding to listening socket giving up.";
         listenfd = -1;
     }
 
