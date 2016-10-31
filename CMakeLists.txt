@@ -3,6 +3,7 @@ project (fds-block-connectors)
 
 set (FDS_INSTALL "/opt/fds/formation_one")
 set (EXTERN_FDS_LIBS "${FDS_INSTALL}/lib")
+set (CMAKE_INSTALL_PREFIX "${FDS_INSTALL}/packages/${PROJECT_NAME}")
 
 find_package (Threads)
 
@@ -19,6 +20,18 @@ find_library (LIB_XDI xdi PATHS "${EXTERN_FDS_LIBS}")
 find_library (LIB_BOOSTSYSTEM boost_system PATHS "${EXTERN_FDS_LIBS}")
 find_library (LIB_BOOSTTHREAD boost_thread PATHS "${EXTERN_FDS_LIBS}")
 find_library (LIB_BOOSTLOG boost_log PATHS "${EXTERN_FDS_LIBS}")
+find_library (LIB_CONFIGPP config++ PATHS "${EXTERN_FDS_LIBS}")
 
 
 add_subdirectory (src)
+
+set (CPACK_PACKAGE_VERSION_MAJOR	"1")
+set (CPACK_PACKAGE_VERSION_MINOR	"0")
+set (CPACK_PACKAGE_VERSION_PATCH	"0")
+set (CPACK_DEBIAN_PACKAGE_ARCHITECTURE	"amd64")
+set (CPACK_DEBIAN_PACKAGE_DESCRIPTION	"Block connectors for Formation One")
+set (CPACK_DEBIAN_PACKAGE_MAINTAINER	"Brian Szmyd <szmyd@formationds.com>")
+set (CPACK_DEBIAN_PACKAGE_NAME		"fds-block-connectors")
+set (CPACK_DEBIAN_PACKAGE_SECTION	"Formation Data Systems")
+set (CPACK_PACKAGING_INSTALL_PREFIX	"${CMAKE_INSTALL_PREFIX}")
+include (CPack)

@@ -7,4 +7,6 @@ add_library (fds-am-connector-scst SHARED
 		ScstMode.cpp
 		ScstTarget.cpp
 		ScstTask.cpp)
-target_link_libraries (fds-am-connector-scst log block ev)
+target_link_libraries (fds-am-connector-scst log block ev config++)
+install (TARGETS fds-am-connector-scst
+		LIBRARY DESTINATION lib/connector)
