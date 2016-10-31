@@ -1,0 +1,77 @@
+buildscript {
+  repositories {
+    jcenter()
+  }
+}
+
+plugins {
+  id "nebula.ospackage" version "3.2.0"
+}
+
+task cleanBuild(type: Exec){
+    commandLine 'rm', '-rf', 'build'
+}
+
+task makeBuildDir(type:Exec) {
+    commandLine 'mkdir', '-p', 'build'
+}
+
+task doCMake(type:Exec, dependsOn: 'makeBuildDir'){
+    workingDir 'build'
+    commandLine 'cmake', '..'
+}
+
+task buildLibs(type:Exec, dependsOn: 'doCMake'){
+    workingDir 'build'
+    commandLine 'make'
+}
+
+task doCTest(type:Exec, dependsOn: 'build'){
+    workingDir 'build/src/tests'
+    commandLine 'ctest'
+}
+
+task doCPack(type:Exec, dependsOn: 'doCTest'){
+    workingDir 'build'
+    commandLine 'cpack', '-G', 'DEB'
+}
+
+build.dependsOn buildLibs
+buildDeb.dependsOn doCPack
+
+task deployDeb( dependsOn: 'buildDeb' ) << {
+        if ( !project.hasProperty( 'username' ) || !project.hasProperty( 'password' ) ){
+                println 'You must specify both a -Pusername and -Ppassword value. Skipping deployDeb task.'
+                return
+        }
+
+        def debName = 'NONE'
+        new File( 'build' ).eachFile( { f ->
+                if ( f.name.endsWith( 'deb' ) ) {
+                        debName = f.name
+                }
+        })
+
+        if ( debName == 'NONE' ) {
+                println 'Nothing to deploy'
+                return
+        }
+
+        println debName
+
+        def fullName = debName
+
+        def deploy_artifactory_local = 'curl -v -X PUT http://' + username + ':' + password + '@bld-artifactory:8081/artifactory/formation-apt/pool/nightly/' + fullName + ';deb.distribution=platform;deb.component=nightly;deb.architecture=amd64 -T ' + 'build/' + fullName
+
+        println deploy_artifactory_local
+
+        def proc_local = deploy_artifactory_local.execute()
+
+        proc_local.text.eachLine { line -> println line }
+
+        if ( proc_local.exitValue() ) {
+                println 'Artifact upload to local artifactory failed.'
+        }
+}
+
+clean.dependsOn cleanBuild
