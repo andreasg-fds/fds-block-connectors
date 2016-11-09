@@ -279,6 +279,10 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
                   << " ndob: " << ndob
                   << " unmap:" << unmap
                   << " lbs:" << lbas;
+           if (0 == lbas) {
+                task->checkCondition(SCST_LOAD_SENSE(scst_sense_invalid_field_in_cdb));
+                continue;
+           }
             uint64_t offset = scsi_cmd.lba * logical_block_size;
             auto writeSameTask = new fds::block::WriteSameTask(task);
             writeSameTask->set(offset, scsi_cmd.bufflen * lbas);
