@@ -189,6 +189,11 @@ TEST(BlockToolsTest, ZeroMaxObjectSize) {
     calculateOffsets(oi, 0, 256*lba_size, 0);
 }
 
+TEST(BlockToolsTest, ZeroLength) {
+    fds::block::OffsetInfo oi;
+    EXPECT_DEATH(calculateOffsets(oi, 2147614720, 0, 131072), "length != 0");
+}
+
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

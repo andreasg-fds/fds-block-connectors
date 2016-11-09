@@ -104,6 +104,12 @@ void
 BlockOperations::_executeTask(RWTask* task) {
     auto length = task->getLength();
     auto offset = task->getOffset();
+    if (length == 0) {
+        LOGERROR << "handle:" << task->getProtoTask()->getHandle() << " length:" << length << " invalid";
+        task->getProtoTask()->setError(ApiErrorCode::XDI_BAD_REQUEST);
+        finishResponse(task);
+        return;
+    }
     OffsetInfo blockRange;
     calculateOffsets(blockRange, offset, length, maxObjectSizeInBytes);
     auto const& numBlocks = blockRange.numTotalBlocks();
