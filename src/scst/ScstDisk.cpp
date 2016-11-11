@@ -99,7 +99,7 @@ ScstDisk::setupInquiryPages(uint64_t const volume_id) {
     ScstDevice::setupInquiryPages(volume_id);
 
     BlockLimitsParameters limits_parameters;
-    limits_parameters &= BlockLimitsParameters::WSNonZeroSupport;
+    limits_parameters &= BlockLimitsParameters::NoWSNonZeroSupport;
     limits_parameters &= BlockLimitsParameters::NoUnmapGranAlignSupport;
     limits_parameters.setMaxATSCount(255u); // No maximum
     limits_parameters.setOptTransferGranularity(std::min(getpagesize() / logical_block_size, 1u));
@@ -285,7 +285,14 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
            }
             uint64_t offset = scsi_cmd.lba * logical_block_size;
             auto writeSameTask = new fds::block::WriteSameTask(task);
-            writeSameTask->set(offset, scsi_cmd.bufflen * lbas);
+            uint32_t length = 0;
+            if (0 == lbas) {
+                // If number of lbas is 0 then write to end of volume
+                length = volume_size - (scsi_cmd.lba * logical_block_size);
+            } else {
+                length = scsi_cmd.bufflen * lbas;
+            }
+            writeSameTask->set(offset, length);
             std::shared_ptr<std::string> write_buffer;
             if (true == ndob) {
                 if (false == unmap) {

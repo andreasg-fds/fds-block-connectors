@@ -18,6 +18,7 @@
  */
 
 #include "connector/block/BlockTools.h"
+#include <assert.h>
 
 namespace fds {
 namespace block {
@@ -41,6 +42,7 @@ void calculateOffsets
   uint32_t const&  maxObjectSizeInBytes
 )
 {
+    assert(length != 0);
     if (maxObjectSizeInBytes == 0) return;
     auto absoluteEndOffset = offset + length - 1;
     info.startBlockOffset = offset / maxObjectSizeInBytes;

@@ -122,6 +122,7 @@ void WriteContext::mergeRanges
         }
     }
 
+    // TODO andreas: this takes an extremely long time for a large range(say 75million)
     // Fill in any remaining gaps for the full range
     for (auto i = newStart; i <= newEnd; ++i) {
         auto offsetItr = newPendingBlobWrite.offsetStatus.find(i);
