@@ -65,7 +65,7 @@ inline static std::shared_ptr<spdlog::logger> createLogger(std::string const& na
         spdlog::set_level(spdlog::level::debug);
         spdlog::set_pattern("[%D %H:%M:%S.%f] [%l] [%t] %v");
     });
-    std::string path = "/fds/var/logs/" + name + "_log";
+    std::string path = "/opt/fds/formation_one/var/logs/" + name + "_log";
     return spdlog::rotating_logger_mt(name, path, 1048576*5, 3);
 }
 
