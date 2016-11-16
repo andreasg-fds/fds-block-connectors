@@ -24,7 +24,7 @@
 #include "stub/FdsStub.h"
 #include "stub/ApiStub.h"
 #include "connector/block/Tasks.h"
-#include "log/Log.h"
+#include "log/test_log.h"
 
 static const uint32_t OBJECTSIZE = 131072;
 static const uint32_t LBASIZE = 512;
@@ -1318,16 +1318,9 @@ TEST_F(AsyncTestConnectorFixture, AsyncWriteTest_qd2_write_overlapping_writeSame
     EXPECT_TRUE(connectorPtr->verifyBuffer(writeBuffer));
 }
 
-namespace xdi {
-    fds_log* g_fdslog = new fds_log("gtestBlockOperations", "", fds_log::trace);
-
-    fds_log* GetLog() {
-        return g_fdslog;
-    }
-} // namespace xdi
-
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
+    xdi::SetTestLogger(xdi::createLogger("gtestBlockOperations"));
     auto seed = time(NULL);
 
     std::cout << "Seed value: " << seed << std::endl;

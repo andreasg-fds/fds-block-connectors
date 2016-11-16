@@ -1,5 +1,5 @@
 /*
- * nbd_log.h
+ * test_log.h
  *
  * Copyright (c) 2016, Andreas Griesshammer <andreas@formationds.com>
  * Copyright (c) 2016, Formation Data Systems
@@ -19,21 +19,21 @@
 
 #include "log/Logger.h"
 
-#ifndef NBD_NBDLOG_H_
-#define NBD_NBDLOG_H_
+#ifndef LOG_TESTLOG_H_
+#define LOG_TESTLOG_H_
 
 namespace xdi {
 
-static std::shared_ptr<spdlog::logger> nbd_logger_;
+static std::shared_ptr<spdlog::logger> test_logger_;
 
-inline static void SetNbdLogger(std::shared_ptr<spdlog::logger> logger) {
-    nbd_logger_ = logger;
+inline static void SetTestLogger(std::shared_ptr<spdlog::logger> logger) {
+    test_logger_ = logger;
 }
 
-inline std::shared_ptr<spdlog::logger> GetLogger() {
-    return nbd_logger_;
+std::shared_ptr<spdlog::logger> GetLogger() {
+    return test_logger_;
 }
 
-}  // namespace xdi
+} // namespace xdi
 
-#endif // NBD_NBDLOG_H_
+#endif // LOG_TESTLOG_H_

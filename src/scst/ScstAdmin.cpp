@@ -32,7 +32,7 @@ extern "C" {
 #include <thread>
 
 #include "connector/scst-standalone/ScstDevice.h"
-//#include "log/Log.h"
+#include "connector/scst-standalone/scst_log.h"
 
 namespace fds {
 namespace connector {
@@ -104,7 +104,7 @@ currentUsers(std::string const& path) {
                     }
                 }
             } else {
-                //GLOGERROR << "user:" << *user << " unable to open";
+                LOGERROR("user:{} unable to open", *user);
             }
             ++user; --glob_buf.gl_pathc;
         }
@@ -144,7 +144,7 @@ ScstAdmin::toggleDriver(bool const enable) {
     std::ofstream dev(scst_iscsi_target_path + scst_iscsi_target_enable,
                       std::ios::out);
     if (!dev.is_open()) {
-        //GLOGERROR << "could not toggle driver, no iSCSI devices will be presented";
+        LOGERROR("could not toggle driver, no iSCSI devices will be presented");
         return;
     }
 
@@ -158,7 +158,7 @@ ScstAdmin::toggleDriver(bool const enable) {
     } else {
         dev << "0" << std::endl;
     }
-    //GLOGNORMAL << "iSCSI driver:" << (enable ? "enabled" : "disabled");
+    LOGINFO("iSCSI driver:{}", (enable ? "enabled" : "disabled"));
 }
 
 /**
@@ -188,7 +188,7 @@ void ScstAdmin::toggleTarget(std::string const& target_name, bool const enable) 
     std::ofstream dev(scst_iscsi_target_path + target_name + scst_iscsi_target_enable,
                       std::ios::out);
     if (!dev.is_open()) {
-        //GLOGERROR << "could not toggle target, no iSCSI devices will be presented";
+        LOGERROR("could not toggle target, no iSCSI devices will be presented");
         return;
     }
 
@@ -198,8 +198,7 @@ void ScstAdmin::toggleTarget(std::string const& target_name, bool const enable) 
     } else { 
         dev << "0" << std::endl;
     }
-    //GLOGNORMAL << "target:" << target_name
-           //   << " " << (enable ? "enabled" : "disabled");
+    LOGINFO("target:{} {}", target_name, (enable ? "enabled" : "disabled"));
 }
 
 /**
@@ -234,7 +233,7 @@ ScstAdmin::currentInitiators(std::string const& target_name, initiator_set& curr
             auto initiator_name = std::string(basename(initiator_base));
             free(initiator_base);
             if (scst_iscsi_host_mgmt != initiator_name) {
-                //GLOGDEBUG << "initiator:" << initiator_name << " found";
+                LOGDEBUG("initiator:{} found", initiator_name);
                 current_set.emplace(std::move(initiator_name));
             }
             ++inititator; --glob_buf.gl_pathc;
@@ -249,12 +248,10 @@ ScstAdmin::currentInitiators(std::string const& target_name, initiator_set& curr
 void ScstAdmin::addIncomingUser(std::string const& target_name,
                                 std::string const& user_name,
                                 std::string const& password) {
-    //GLOGDEBUG << "user:" << user_name
-          //   << " target:" << target_name
-          //   << " adding iSCSI target attribute";
+    LOGDEBUG("user:{} target:{} adding iSCSI target attribute", user_name, target_name);
     std::ofstream tgt_dev(scst_iscsi_target_path + scst_iscsi_target_mgmt, std::ios::out);
     if (!tgt_dev.is_open()) {
-        //GLOGERROR << "target:" << target_name << " unable to add attribute";
+        LOGERROR("target:{} unable to add attribute", target_name);
         return;
     }
     tgt_dev << "add_target_attribute "  << target_name
@@ -268,12 +265,10 @@ void ScstAdmin::addIncomingUser(std::string const& target_name,
 void ScstAdmin::addOutgoingUser(std::string const& target_name,
                                 std::string const& user_name,
                                 std::string const& password) {
-    //GLOGDEBUG << "user:" << user_name
-           //  << " target:" << target_name
-            // << " adding iSCSI target attribute";
+    LOGDEBUG("user:{} target:{} adding iSCSI target attribute", user_name, target_name);
     std::ofstream tgt_dev(scst_iscsi_target_path + scst_iscsi_target_mgmt, std::ios::out);
     if (!tgt_dev.is_open()) {
-        //GLOGERROR << "target:" << target_name << " unable to add attribute";
+        LOGERROR("target:{} unable to add attribute", target_name);
         return;
     }
     tgt_dev << "add_target_attribute "  << target_name
@@ -287,7 +282,7 @@ void ScstAdmin::addOutgoingUser(std::string const& target_name,
  */
 void
 ScstAdmin::addToScst(std::string const& target_name) {
-    //GLOGDEBUG << "target:" << target_name << " adding iSCSI target";
+    LOGDEBUG("target:{} adding iSCSI target", target_name);
     std::ofstream tgt_dev(scst_iscsi_target_path + scst_iscsi_target_mgmt, std::ios::out);
 
     if (tgt_dev.is_open()) {
@@ -295,7 +290,7 @@ ScstAdmin::addToScst(std::string const& target_name) {
         tgt_dev << scst_iscsi_cmd_add << " " << target_name << std::endl;
         return;
     }
-    //GLOGERROR << "target:" << target_name << " could not create target";
+    LOGERROR("target:{} could not create target", target_name);
     throw ScstError::scst_error;
 }
 
@@ -310,12 +305,10 @@ bool ScstAdmin::groupExists(std::string const& target_name, std::string const& g
  */
 void ScstAdmin::removeIncomingUser(std::string const& target_name,
                         std::string const& user_name) {
-    //GLOGDEBUG << "user:" << user_name
-          //   << " target:" << target_name
-           //  << " removing iSCSI target attribute";
+    LOGDEBUG("user:{} target:{} removing iSCSI target attribute", user_name, target_name);
     std::ofstream tgt_dev(scst_iscsi_target_path + scst_iscsi_target_mgmt, std::ios::out);
     if (!tgt_dev.is_open()) {
-        //GLOGERROR << "target:" << target_name << " could not remove attribute";
+        LOGERROR("target:{} could not remove attribute", target_name);
         return;
     }
     tgt_dev << "del_target_attribute "  << target_name
@@ -327,12 +320,10 @@ void ScstAdmin::removeIncomingUser(std::string const& target_name,
  */
 void ScstAdmin::removeOutgoingUser(std::string const& target_name,
                         std::string const& user_name) {
-    //GLOGDEBUG << "user:" << user_name
-            // << " target:" << target_name
-            // << " removing iSCSI target attribute";
+    LOGDEBUG("user:{} target:{} removing iSCSI target attribute", user_name, target_name);
     std::ofstream tgt_dev(scst_iscsi_target_path + scst_iscsi_target_mgmt, std::ios::out);
     if (!tgt_dev.is_open()) {
-        //GLOGERROR << "target:" << target_name << " could not remove attribute";
+        LOGERROR("target:{} could not remove attribute", target_name);
         return;
     }
     tgt_dev << "del_target_attribute "  << target_name
@@ -347,7 +338,7 @@ bool ScstAdmin::mapDevices(std::string const& target_name,
     auto default_lun_path = scst_iscsi_target_path + target_name + scst_iscsi_lun_path + scst_iscsi_lun_mgmt;
     std::ofstream lun_mgmt(default_lun_path, std::ios::out);
     if (!lun_mgmt.is_open()) {
-        //GLOGERROR << "target:" << target_name << " could not remove default luns";
+        LOGERROR("target:{} could not remove default luns", target_name);
     } else {
         auto lun_path = scst_iscsi_target_path + target_name + scst_iscsi_lun_path;
         for (auto const& device : device_map) {
@@ -370,7 +361,7 @@ bool ScstAdmin::mapDevices(std::string const& target_name,
 
     lun_mgmt.open(lun_mgmt_path + scst_iscsi_lun_mgmt, std::ios::out);
     if (!lun_mgmt.is_open()) {
-        //GLOGERROR << "target:" << target_name << " could not map luns";
+        LOGERROR("target:{} could not map luns", target_name);
         return false;
     }
 
@@ -381,7 +372,7 @@ bool ScstAdmin::mapDevices(std::string const& target_name,
 
     std::ofstream copy_mgmt(copy_mgmt_path + scst_iscsi_lun_mgmt, std::ios::out);
     if (!copy_mgmt.is_open()) {
-        //GLOGWARN << "target:" << target_name << " could not be mapped to copy manager";
+        LOGWARN("target:{} could not be mapped to copy manager", target_name);
     }
 
 
@@ -419,7 +410,7 @@ void ScstAdmin::removeDevice(std::string const& target_name,
 
     std::ofstream lun_mgmt(lun_mgmt_path + scst_iscsi_lun_mgmt, std::ios::out);
     if (!lun_mgmt.is_open()) {
-        //GLOGERROR << "target:" << target_name << " could not unmap lun";
+        LOGERROR("target:{} could not unmap lun", target_name);
         return;
     }
 
@@ -446,7 +437,7 @@ bool ScstAdmin::applyMasking(std::string const& target_name, initiator_set const
         std::ofstream ini_mgmt(scst_iscsi_target_path + target_name + scst_iscsi_ini_mgmt,
                               std::ios::out);
         if (!ini_mgmt.is_open()) {
-            //GLOGWARN << "could not open mgmt interface to create masking group";
+            LOGWARN("could not open mgmt interface to create masking group");
             return false;
         }
         ini_mgmt << "create " << scst_secure_group_name << std::endl;
@@ -469,7 +460,7 @@ bool ScstAdmin::applyMasking(std::string const& target_name, initiator_set const
                                    + scst_iscsi_host_mgmt,
                                std::ios::out);
         if (!host_mgmt.is_open()) {
-            //GLOGWARN << "could not open mgmt interface to add initiators to group.";
+            LOGWARN("could not open mgmt interface to add initiators to group");
             return false;
         }
         std::vector<std::string> manip_list;
@@ -498,7 +489,7 @@ bool ScstAdmin::applyMasking(std::string const& target_name, initiator_set const
  * Before a target can be removed, all sessions must be closed
  */
 void ScstAdmin::removeInitiators(std::string const& target_name) {
-    //GLOGDEBUG << "target:" << target_name << " closing active sessions";
+    LOGDEBUG("target:{} closing active sessions", target_name);
     glob_t glob_buf;
     auto pattern = scst_iscsi_target_path + target_name + "/sessions/*/force_close";
     auto res = glob(pattern.c_str(), GLOB_ERR, nullptr, &glob_buf);
@@ -511,9 +502,7 @@ void ScstAdmin::removeInitiators(std::string const& target_name) {
                 session_close << "1" << std::endl;
             }
             if (!session_close.good()) {
-                //GLOGWARN << "session:" << *session
-                //        << " target:" << target_name
-                //        << " could not close session";
+                LOGWARN("session:{} target:{} could not close session", *session, target_name);
             }
             ++session; --glob_buf.gl_pathc;
         }
@@ -528,7 +517,7 @@ void ScstAdmin::removeInitiators(std::string const& target_name) {
 void ScstAdmin::removeFromScst(std::string const& target_name) {
     removeInitiators(target_name);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    //GLOGDEBUG << "target:" << target_name << " removing iSCSI target";
+    LOGDEBUG("target:{} removing iSCSI target", target_name);
     std::ofstream tgt_dev(scst_iscsi_target_path + scst_iscsi_target_mgmt, std::ios::out);
 
     if (tgt_dev.is_open()) {
@@ -538,18 +527,17 @@ void ScstAdmin::removeFromScst(std::string const& target_name) {
             return;
         }
     }
-    //GLOGWARN << "target:" << target_name << " could not remove target";
+    LOGWARN("target:{} could not remove target", target_name);
 }
 
 /**
  * Remove the given credential to the target's IncomingUser attributes
  */
 void ScstAdmin::setQueueDepth(std::string const& target_name, uint32_t const queue_depth) {
-    //GLOGDEBUG << "target:" << target_name
-           // << " queuedepth:" << queue_depth << " setting iSCSI target queue depth";
+    LOGDEBUG("target:{} queuedepth:{} setting iSCSI target queue depth", target_name, queue_depth);
     std::ofstream tgt_dev(scst_iscsi_target_path + target_name + "/QueuedCommands", std::ios::out);
     if (!tgt_dev.is_open()) {
-        //GLOGERROR << "target:" << target_name << " could not set queue depth";
+        LOGERROR("target:{} could not set queue depth", target_name);
         throw ScstError::scst_error;
     }
     tgt_dev << queue_depth << std::endl;

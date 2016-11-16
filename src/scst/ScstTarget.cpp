@@ -28,7 +28,7 @@
 
 #include "connector/scst-standalone/ScstConnector.h"
 #include "connector/scst-standalone/ScstDisk.h"
-//#include "log/Log.h"
+#include "connector/scst-standalone/scst_log.h"
 
 namespace fds {
 namespace connector {
@@ -45,14 +45,14 @@ ScstTarget::ScstTarget(ScstConnector* parent_connector,
     // TODO(bszmyd): Sat 12 Sep 2015 12:14:19 PM MDT
     // We can support other target-drivers than iSCSI...TBD
     // Create an iSCSI target in the SCST mid-ware for our handler
-    //GLOGDEBUG << "target:" << target_name << " creating iSCSI target";
+    LOGDEBUG("target:{} creating iSCSI target", target_name);
     ScstAdmin::addToScst(target_name);
     ScstAdmin::setQueueDepth(target_name, queue_depth);
 
     // Start watching the loop
     evLoop = std::make_shared<ev::dynamic_loop>(ev::NOENV | ev::POLL);
     if (!evLoop) {
-        //GLOGERROR << "failed to initialize lib_ev";
+        LOGERROR("failed to initialize lib_ev");
         throw ScstError::scst_error;
     }
 
@@ -74,7 +74,7 @@ ScstTarget::addDevice(volume_ptr& vol_desc) {
 
     // Check if we have a device with this name already
     if (device_map.end() != device_map.find(vol_desc->volumeName)) {
-        //GLOGDEBUG << "vol:" << vol_desc->volumeName << " already have device for volume";
+        LOGDEBUG("vol:{} already have device for volume", vol_desc->volumeName);
         return;
     }
 
@@ -83,13 +83,11 @@ ScstTarget::addDevice(volume_ptr& vol_desc) {
                                    lun_table.end(),
                                    [] (ScstAdmin::device_ptr& p) -> bool { return (!!p); });
     if (lun_table.end() == lun_it) {
-        //GLOGNOTIFY << "target:" << target_name << " exhausted all LUNs";
+        LOGINFO("target:{} exhausted all LUNs", target_name);
         return;
     }
     int32_t lun_number = std::distance(lun_table.begin(), lun_it);
-    //GLOGDEBUG << "vol:" << vol_desc->volumeName
-       //      << " lun:" << lun_number
-        //     << " mapping LUN";
+    LOGDEBUG("vol:{} lun:{} mapping LUN", vol_desc->volumeName, lun_number);
 
     *lun_it = std::make_shared<ScstDisk>(vol_desc, this, api_);
 
@@ -219,7 +217,7 @@ ScstTarget::wakeupCb(ev::async&, int) {
 void
 ScstTarget::lead() {
     evLoop->run(0);
-    //GLOGNORMAL <<  "target:" << target_name << " shutdown";
+    LOGINFO("target:{} shutdown", target_name);
     // If we were removed, disconnect sessions, otherwise we are just restarting
     {
         std::lock_guard<std::mutex> g(deviceLock);

@@ -1,5 +1,5 @@
 /*
- * Log.h
+ * scst_log.h
  *
  * Copyright (c) 2016, Andreas Griesshammer <andreas@formationds.com>
  * Copyright (c) 2016, Formation Data Systems
@@ -22,18 +22,16 @@
 #ifndef SCST_SCSTLOG_H_
 #define SCST_SCSTLOG_H_
 
-#define LOGGER xdi::GetScstLogger()
-
 namespace xdi {
 
-static std::shared_ptr<spdlog::logger> logger_;
+static std::shared_ptr<spdlog::logger> scst_logger_;
 
 inline static void SetScstLogger(std::shared_ptr<spdlog::logger> logger) {
-    logger_ = logger;
+    scst_logger_ = logger;
 }
 
-inline std::shared_ptr<spdlog::logger> GetScstLogger() {
-    return logger_;
+inline std::shared_ptr<spdlog::logger> GetLogger() {
+    return scst_logger_;
 }
 
 }  // namespace xdi

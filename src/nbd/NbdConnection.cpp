@@ -130,7 +130,7 @@ NbdConnection::NbdConnection(NbdConnector* server,
 }
 
 NbdConnection::~NbdConnection() {
-    //GLOGNORMAL << "socket:" << clientSocket << " NBD client disconnected";
+    LOGINFO("socket:{} NBD client disconnected", clientSocket);
     asyncWatcher->stop();
     ioWatcher->stop();
     ::shutdown(clientSocket, SHUT_RDWR);
@@ -327,10 +327,11 @@ bool NbdConnection::io_request(ev::io &watcher) {
     request.header_off = 0;
     request.data_off = -1;
 
-    //GLOGIO << "op:" << io_to_string[request.header.opType]
-     //     << " handle:" << request.header.handle
-       //   << " offset:" << request.header.offset
-       //   << " length:" << request.header.length;
+    LOGTRACE("op:{} handle:{} offset:{} length:{}",
+            io_to_string[request.header.opType],
+            request.header.handle,
+            request.header.offset,
+            request.header.length);
 
     dispatchOp();
     request.data.reset();
@@ -368,14 +369,15 @@ NbdConnection::io_reply(ev::io&) {
         xdi::ApiErrorCode err = current_response->getError();
         if (xdi::ApiErrorCode::XDI_OK != err) {
             response[1].iov_base = to_iovec(&error_bad);
-            //GLOGERROR << "returning error:" << static_cast<std::underlying_type<xdi::ApiErrorCode>::type>(err);
+            LOGERROR("err:{}", static_cast<std::underlying_type<xdi::ApiErrorCode>::type>(err));
         } else if (true == current_response->isRead()) {
             uint32_t context = 0;
             auto buf = current_response->getNextReadBuffer(context);
             while (buf != NULL) {
-                //GLOGDEBUG << "handle:" << current_response->handle
-                  //       << " size:" << buf->length()
-                   //      << " buffer:" << context;
+                LOGDEBUG("handle:{} size:{} buffer:{}",
+                        current_response->handle,
+                        buf->length(),
+                        context);
                 response[total_blocks].iov_base = to_iovec(buf->c_str());
                 response[total_blocks].iov_len = buf->length();
                 ++total_blocks;
@@ -425,7 +427,7 @@ NbdConnection::dispatchOp() {
         case NBD_CMD_FLUSH:
             break;
         case NBD_CMD_DISC:
-            //GLOGNORMAL << "got disconnect";
+            LOGINFO("got disconnect");
         default:
             throw fds::block::BlockError::shutdown_requested;
             break;
@@ -458,7 +460,7 @@ NbdConnection::wakeupCb(ev::async&, int) {
 void
 NbdConnection::ioEvent(ev::io &watcher, int revents) {
     if (EV_ERROR & revents) {
-        //GLOGERROR << "invalid libev event";
+        LOGERROR("invalid libev event");
         return;
     }
 
@@ -479,8 +481,7 @@ NbdConnection::ioEvent(ev::io &watcher, int revents) {
                     { continue; }
                 break;
             default:
-                //GLOGDEBUG << "asked to read in state:"
-                      //   << state_to_string[static_cast<uint32_t>(nbd_state)];
+                LOGDEBUG("asked to read in state:{}", state_to_string[static_cast<uint32_t>(nbd_state)]);
                 // We could have read and writes waiting and are not in the
                 // correct state to handle more requests...yet
                 break;
@@ -497,7 +498,7 @@ NbdConnection::ioEvent(ev::io &watcher, int revents) {
             case NbdProtoState::SENDOPTS:
                 if (option_reply(watcher)) {
                     nbd_state = NbdProtoState::DOREQS;
-                    //GLOGDEBUG << "done with NBD handshake";
+                    LOGDEBUG("done with NBD handshake");
                 }
                 break;
             case NbdProtoState::DOREQS:
@@ -566,17 +567,17 @@ bool nbd_read(int fd, D& data, ssize_t& off, ssize_t const len)
     if (0 > nread) {
         switch (0 > nread ? errno : EPIPE) {
             case EAGAIN:
-                //GLOGTRACE << "payload not there";
+                LOGTRACE("payload not there");
                 return false; // We were optimistic the payload was ready.
             case EPIPE:
-                //GLOGNOTIFY << "client disconnected";
+                LOGINFO("client disconnected");
             default:
-                //GLOGERROR << "socket read error:" << strerror(errno);
+                LOGERROR("socket read error:{}", strerror(errno));
                 throw fds::block::BlockError::shutdown_requested;
         }
     } else if (0 == nread) {
         // Orderly shutdown of the TCP connection
-        //GLOGNORMAL << "client disconnected";
+        LOGINFO("client disconnected");
         throw fds::block::BlockError::connection_closed;
     } else if (nread < len) {
         // Only received some of the data so far

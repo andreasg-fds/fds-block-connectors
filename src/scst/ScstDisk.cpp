@@ -31,7 +31,7 @@ extern "C" {
 
 #include <boost/make_shared.hpp>
 
-//#include "log/Log.h"
+#include "connector/scst-standalone/scst_log.h"
 
 #include "connector/scst-standalone/ScstTask.h"
 #include "connector/scst-standalone/ScstInquiry.h"
@@ -153,7 +153,7 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
     switch (op_code) {
     case FORMAT_UNIT:
         {
-            //GLOGTRACE << "format unit received";
+            LOGTRACE("format unit received");
             bool fmtpinfo = (0x00 != (scsi_cmd.cdb[1] & 0x80));
             bool fmtdata = (0x00 != (scsi_cmd.cdb[1] & 0x10));
 
@@ -171,19 +171,15 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
     case READ_16:
         {
             // If we are anything but READ_6 read the PR and FUA bits
-            //bool fua = false;
+            bool fua = false;
             uint8_t rdprotect = 0x00;
             if (READ_6 != op_code) {
                 rdprotect = (0x07 & (scsi_cmd.cdb[1] >> 5));
-             //   fua = (0x00 != (scsi_cmd.cdb[1] & 0x08));
+                fua = (0x00 != (scsi_cmd.cdb[1] & 0x08));
             }
 
-            //GLOGIO << "iotype:read"
-              //    << " lba:" << scsi_cmd.lba
-              //    << " length:" << scsi_cmd.bufflen
-               //   << " fua:" << fua
-               //   << " pr:" << (uint32_t)rdprotect
-               //   << " handle:" << cmd->cmd_h;
+            LOGTRACE("iotype:read lba:{} length:{} fua:{} pr:{} handle:{}",
+                    scsi_cmd.lba, scsi_cmd.bufflen, fua, (uint32_t)rdprotect, cmd->cmd_h);
 
             // We do not support rdprotect data
             if (0x00 != rdprotect) {
@@ -219,7 +215,7 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
                 break;
             default:
                 {
-                    //GLOGIO << "unsupported SAI:" << (uint32_t)action;
+                    LOGTRACE("unsupported SAI:{}", (uint32_t)action);
                     task->checkCondition(SCST_LOAD_SENSE(scst_sense_invalid_field_in_cdb));
                 }
                 break;
@@ -232,19 +228,15 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
     case WRITE_16:
         {
             // If we are anything but READ_6 read the PR and FUA bits
-            //bool fua = false;
+            bool fua = false;
             uint8_t wrprotect = 0x00;
             if (WRITE_6 != op_code) {
                 wrprotect = (0x07 & (scsi_cmd.cdb[1] >> 5));
-            //    fua = (0x00 != (scsi_cmd.cdb[1] & 0x08));
+                fua = (0x00 != (scsi_cmd.cdb[1] & 0x08));
             }
 
-            //GLOGIO << "iotype:write"
-              //    << " lba:" << scsi_cmd.lba
-               //   << " length:" << scsi_cmd.bufflen
-               //   << " fua:" << fua
-               //   << " pr:" << (uint32_t)wrprotect
-               //   << " handle:" << cmd->cmd_h;
+            LOGTRACE("iotype:write lba:{} length:{} fua:{} pr:{} handle:{}",
+                    scsi_cmd.lba, scsi_cmd.bufflen, fua, (uint32_t)wrprotect, cmd->cmd_h);
 
             // We do not support wrprotect data
             if (0x00 != wrprotect) {
@@ -274,11 +266,8 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
            bool ndob = (0 != (scsi_cmd.cdb[1] & 0x01));
            uint32_t lbas = be32toh(*(uint32_t*)(scsi_cmd.cdb + 10));
 
-           //GLOGIO << "WriteSame:" << scsi_cmd.lba
-               //   << " length:" << scsi_cmd.bufflen
-               //   << " ndob: " << ndob
-               //   << " unmap:" << unmap
-               //   << " lbs:" << lbas;
+           LOGDEBUG("WriteSame:{} length:{} ndob:{} unmap:{} lbs:{}",
+                   scsi_cmd.lba, scsi_cmd.bufflen, ndob, unmap, lbas);
            if (0 == lbas) {
                 task->checkCondition(SCST_LOAD_SENSE(scst_sense_invalid_field_in_cdb));
                 continue;
@@ -315,14 +304,12 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
         break;
     case UNMAP:
         {
-           // bool anchored = (0 != (scsi_cmd.cdb[1] & 0x01));
-           // auto listLength = be16toh(*(uint16_t*)(scsi_cmd.cdb + 7));
-           // auto unmap_data_length = be16toh(*(uint16_t*)(buffer));
+            bool anchored = (0 != (scsi_cmd.cdb[1] & 0x01));
+            auto listLength = be16toh(*(uint16_t*)(scsi_cmd.cdb + 7));
+            auto unmap_data_length = be16toh(*(uint16_t*)(buffer));
             auto unmap_block_descriptor_data_length = be16toh(*(uint16_t*)(buffer + 2));
-            //GLOGIO << "unmap:" << listLength
-                //   << " anchored:" << anchored
-                //   << " unmapdatalength:" << unmap_data_length
-                //   << " unmapblockdescriptordatalength:" << unmap_block_descriptor_data_length;
+            LOGDEBUG("unmap:{} anchored:{} unmapdatalength:{} unmapblockdescriptordatalength:{}",
+                    listLength, anchored, unmap_data_length, unmap_block_descriptor_data_length);
             fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
             for (int i = 8; i < 8 + unmap_block_descriptor_data_length && i + 16 <= unmap_block_descriptor_data_length + 8; i += 16) {
                 auto unmap_lba = be64toh(*(uint64_t*)(buffer + i));
@@ -343,9 +330,7 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
         }
         break;
     default:
-        //GLOGIO    << "iotype:unsupported"
-              //   << " opcode:" << (uint32_t)(op_code)
-              //   << " cdblength:" << scsi_cmd.cdb_len;
+        LOGDEBUG("iotype:unsupported opcode:{} cdblength:{}", (uint32_t)(op_code), scsi_cmd.cdb_len);
         task->checkCondition(SCST_LOAD_SENSE(scst_sense_invalid_opcode));
         break;
     }
@@ -354,7 +339,7 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
 }
 
 void ScstDisk::read_capacity(ScstTask* task) const {
-    //GLOGTRACE << "iotype:readcapacity";
+    LOGTRACE("iotype:readcapacity");
     auto& scsi_cmd = cmd->exec_cmd;
     auto& op_code = scsi_cmd.cdb[0];
 
@@ -384,10 +369,10 @@ void ScstDisk::read_capacity(ScstTask* task) const {
 void ScstDisk::execDeviceRemap() {
     // TODO(bszmyd): Wed 06 Apr 2016 02:04:05 PM MDT
     // Support true thin provisioning MAP/UNMAP
-    //GLOGIO << "iotype:remap"
-        //  << " src-lba:" << cmd->remap_cmd.data_descr.src_lba
-        //  << " dst-lba:" << cmd->remap_cmd.data_descr.dst_lba
-        //  << " length:" << cmd->remap_cmd.data_descr.data_len;
+    LOGDEBUG("iotype:remap src-lba:{} dst-lba:{} length:{}",
+            cmd->remap_cmd.data_descr.src_lba,
+            cmd->remap_cmd.data_descr.dst_lba,
+            cmd->remap_cmd.data_descr.data_len);
     auto task = new ScstTask(cmd->cmd_h, cmd->subcode);
     task->setResult(&cmd->remap_cmd.data_descr);
     readyResponses.push(task);
@@ -400,30 +385,28 @@ void ScstDisk::respondTask(fds::block::BlockTask* response) {
     if (xdi::ApiErrorCode::XDI_OK != err) {
         if (xdi::ApiErrorCode::XDI_MISSING_VOLUME == err) {
             // Volume may have been removed, shutdown and destroy target
-            //GLOGNOTIFY << "lun destroyed";
+            LOGINFO("lun destroyed");
             task->checkCondition(SCST_LOAD_SENSE(scst_sense_lun_not_supported));
         } else if ((fds::block::TaskType::READ == response->match(&v)) &&
                    (false == isRetryable(err))) {
-           // auto btask = static_cast<fds::block::ReadTask*>(response);
-            //GLOGCRITICAL << "iotype:read"
-               //         << " handle:" << task->getHandle()
-               //         << " offset:" << btask->getOffset()
-               //         << " length:" << btask->getLength()
-                //        << " had critical failure.";
+            auto btask = static_cast<fds::block::ReadTask*>(response);
+            LOGCRITICAL("iotype:read handle:{} offset:{} length:{} had critical failure",
+                    task->getHandle(),
+                    btask->getOffset(),
+                    btask->getLength());
             task->checkCondition(SCST_LOAD_SENSE(scst_sense_read_error));
         } else if (false == isRetryable(err)) {
-           // auto btask = static_cast<fds::block::WriteTask*>(response);
-            //GLOGCRITICAL << "iotype:write"
-                 //       << " handle:" << task->getHandle()
-                  //      << " offset:" << btask->getOffset()
-                  //      << " length:" << btask->getLength()
-                 //       << " had critical failure.";
+            auto btask = static_cast<fds::block::WriteTask*>(response);
+            LOGCRITICAL("iotype:write handle:{} offset:{} length:{} had critical failure",
+                    task->getHandle(),
+                    btask->getOffset(),
+                    btask->getLength());
             task->checkCondition(SCST_LOAD_SENSE(scst_sense_write_error));
         } else {
             // Non-catastrophic (retriable) error
-            //GLOGIO << "iotype:" << (fds::block::TaskType::READ == response->match(&v) ? "read" : "write")
-               //   << " handle:" << task->getHandle()
-               //   << " had retriable failure.";
+            LOGDEBUG("iotype:{} handle:{} had retriable failure",
+                    (fds::block::TaskType::READ == response->match(&v) ? "read" : "write"),
+                    task->getHandle());
             task->checkCondition(SCST_LOAD_SENSE(scst_sense_internal_failure));
         }
     } else if (fds::block::TaskType::READ == response->match(&v)) {
