@@ -40,7 +40,6 @@ extern "C" {
 #include "xdi/ApiResponseInterface.h"
 #include "connector/nbd/nbd_log.h"
 
-
 /// These constants come from the Nbd Protocol
 /// ******************************************
 static constexpr uint8_t NBD_MAGIC[]    = { 0x49, 0x48, 0x41, 0x56, 0x45, 0x4F, 0x50, 0x54 };

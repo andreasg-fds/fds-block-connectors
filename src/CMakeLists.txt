@@ -9,6 +9,8 @@ find_library (LIB_EV ev PATHS "${EXTERN_FDS_LIBS}")
 include_directories (BEFORE include)
 include_directories (BEFORE SYSTEM ${FDS_INCLUDES})
 
+include (spdlog.cmake)
+
 add_subdirectory (lib)
 add_subdirectory (nbd)
 add_subdirectory (scst)

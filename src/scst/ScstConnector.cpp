@@ -192,7 +192,7 @@ ScstConnector::ScstConnector(std::string const& prefix,
           queue_depth(depth)
 {
     xdi::SetScstLogger(xdi::createLogger("scst"));
-    LOGGER->info("ScstConnector constructor");
+    LOGINFO("ScstConnector constructor");
 }
 
 static auto const rediscovery_delay = std::chrono::seconds(10);
