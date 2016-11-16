@@ -21,17 +21,12 @@
 #include <string>
 #include <thread>
 
+#include <iostream>
+
 #include "connector/scst-standalone/ScstConnector.h"
 #include "connector/scst-standalone/ScstTarget.h"
-#include "log/Log.h"
-
-namespace xdi {
-    fds_log* g_fdslog = new fds_log("ScstConnector", LOG_LOCATION, fds_log::normal);
-
-    fds_log* GetLog() {
-        return g_fdslog;
-    }
-} // namespace xdi
+//#include "log/Log.h"
+#include "connector/scst-standalone/scst_log.h"
 
 namespace fds {
 namespace connector {
@@ -83,7 +78,7 @@ void ScstConnector::targetDone(const std::string target_name) {
         auto it_target_name = target_prefix + target_pair.first->volumeName;
         if (it_target_name == target_name) {
             targets_.erase(target_pair.first);
-            GLOGNOTIFY << "vol:" << target_name << " connector removed target";
+            //GLOGNOTIFY << "vol:" << target_name << " connector removed target";
             break;
         }
     }
@@ -111,8 +106,8 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
                                             api_));
             it->second->addDevice(volDesc);
         } catch (ScstError& e) {
-            GLOGNOTIFY << "vol:" << volDesc
-                      << " failed to initialize target which will be blacklisted";
+            //GLOGNOTIFY << "vol:" << volDesc
+                //      << " failed to initialize target which will be blacklisted";
             if (it->second) {
                 it->second->deviceDone(volDesc->volumeName, true);
             }
@@ -129,7 +124,7 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
     // If we already had a target, and it's shutdown...wait for it to complete
     // before trying to apply the apparently new descriptor
     if (!target.enabled()) {
-        GLOGNOTIFY << "vol:" << target_name << " waiting for existing target to complete shutdown";
+        //GLOGNOTIFY << "vol:" << target_name << " waiting for existing target to complete shutdown";
         return false;
     }
 
@@ -145,17 +140,17 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
     for (auto const& cred : volDesc->incomingCredentials) {
         auto password = cred.password;
         if (minimum_chap_password_len > password.size()) {
-            GLOGWARN << "user:" << cred.username
-                    << " length:" << password.size()
-                    << " minlength:" << minimum_chap_password_len
-                    << " extending undersized password";
+            //GLOGWARN << "user:" << cred.username
+                //    << " length:" << password.size()
+                //    << " minlength:" << minimum_chap_password_len
+                 //   << " extending undersized password";
             password.resize(minimum_chap_password_len, '*');
         }
         auto cred_it = incoming_credentials.end();
         bool happened;
         std::tie(cred_it, happened) = incoming_credentials.emplace(cred.username, password);
         if (!happened) {
-            GLOGWARN << "user:" << cred.username << " duplicate";
+            //GLOGWARN << "user:" << cred.username << " duplicate";
         }
     }
 
@@ -165,10 +160,10 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
         auto const& cred = volDesc->outgoingCredentials;
         auto password = cred.password;
         if (minimum_chap_password_len > password.size()) {
-            GLOGWARN << "user:" << cred.username
-                    << " length:" << password.size()
-                    << " minlength:" << minimum_chap_password_len
-                    << " extending undersized password";
+            //GLOGWARN << "user:" << cred.username
+               //     << " length:" << password.size()
+                //    << " minlength:" << minimum_chap_password_len
+               //     << " extending undersized password";
             password.resize(minimum_chap_password_len, '*');
         }
         outgoing_credentials.emplace(cred.username, password);
@@ -196,6 +191,8 @@ ScstConnector::ScstConnector(std::string const& prefix,
           target_prefix(prefix),
           queue_depth(depth)
 {
+    xdi::SetScstLogger(xdi::createLogger("scst"));
+    LOGGER->info("ScstConnector constructor");
 }
 
 static auto const rediscovery_delay = std::chrono::seconds(10);
@@ -204,7 +201,8 @@ void
 ScstConnector::discoverTargets() {
     ScstAdmin::toggleDriver(false);
     while (!stopping) {
-        GLOGTRACE << "Discovering iSCSI volumes to export.";
+        //GLOGTRACE << "Discovering iSCSI volumes to export.";
+        LOGGER->warn("Discovering iSCSI volumes to export.");
         xdi::RequestHandle requestId{0,0};
         xdi::Request r{requestId, xdi::RequestType::LIST_ALL_VOLUMES_TYPE, this};
         xdi::ListAllVolumesRequest req;
@@ -215,7 +213,7 @@ ScstConnector::discoverTargets() {
         stopping_condition_.wait_for(lk, rediscovery_delay);
     }
     ScstAdmin::toggleDriver(false);
-    GLOGNOTIFY << "Shutdown discovery loop";
+    //GLOGNOTIFY << "Shutdown discovery loop";
 }
 
 void
@@ -240,8 +238,8 @@ ScstConnector::listAllVolumesResp(xdi::RequestHandle const&,
                     for (auto const& target_pair : targets_) {
                         if (target_pair.first->volumeName == vol->volumeName &&
                             target_pair.first->volumeId != vol->volumeId) {
-                            GLOGNOTIFY << "Skipping: " << vol->volumeName
-                                      << " while: " << target_pair.first << " shutsdown.";
+                            //GLOGNOTIFY << "Skipping: " << vol->volumeName
+                              //        << " while: " << target_pair.first << " shutsdown.";
                             removeTarget(target_pair.first);
                             should_add = false;
                             break;
@@ -249,7 +247,7 @@ ScstConnector::listAllVolumesResp(xdi::RequestHandle const&,
                     }
                     if (should_add) {
                         if (addTarget(currVol)) {
-                            GLOGNORMAL << "Added: " << vol->volumeName;
+                            //GLOGNORMAL << "Added: " << vol->volumeName;
                         }
                     }
                 }

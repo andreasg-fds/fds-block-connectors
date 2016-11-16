@@ -28,6 +28,7 @@
 
 #include "xdi/ApiResponseInterface.h"
 #include "connector/scst-standalone/ScstCommon.h"
+#include "spdlog/spdlog.h"
 
 namespace xdi
 {

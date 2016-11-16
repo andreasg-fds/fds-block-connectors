@@ -17,7 +17,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 #include "connector/block/WriteContext.h"
-#include "log/Log.h"
+//#include "log/Log.h"
 
 namespace fds {
 namespace block {
@@ -142,7 +142,7 @@ void WriteContext::mergeRanges
     auto emplace_itr = _pendingBlobWrites.begin();
     std::tie(emplace_itr, happened) = _pendingBlobWrites.emplace(lowestStart, std::move(newPendingBlobWrite));
     if (false == happened) {
-        LOGERROR << "emplace failed" << std::endl;
+        //LOGERROR << "emplace failed" << std::endl;
     }
 }
 
@@ -192,7 +192,7 @@ bool WriteContext::addPendingWrite(ObjectOffsetVal const& newStart, ObjectOffset
             for (auto i = newStart; i <= newEnd; ++i) {
                 auto o_itr = b_itr->second.offsetStatus.find(i);
                 if (b_itr->second.offsetStatus.end() == o_itr) {
-                    LOGERROR << "offset:" << i << " missing";
+                    //LOGERROR << "offset:" << i << " missing";
                 } else {
                     o_itr->second.isStable = false;
                 }
@@ -217,7 +217,7 @@ void WriteContext::triggerWrite(ObjectOffsetVal const& offset) {
         }
         ++itr;
     }
-    LOGERROR << "offset:" << offset << " missing";
+    //LOGERROR << "offset:" << offset << " missing";
 }
 
 void WriteContext::updateOffset(ObjectOffsetVal const& offset, ObjectId const& id) {
@@ -234,7 +234,7 @@ void WriteContext::updateOffset(ObjectOffsetVal const& offset, ObjectId const& i
         }
         ++itr;
     }
-    LOGERROR << "offset:" << offset << " missing";
+    //LOGERROR << "offset:" << offset << " missing";
 }
 
 void WriteContext::setOffsetObjectBuffer(ObjectOffsetVal const& offset, std::shared_ptr<std::string> buf) {
@@ -339,13 +339,13 @@ WriteContext::QueueResult WriteContext::queue_update(ObjectOffsetVal const& offs
                    return QueueResult::AddedEntry;
                }
            } else {
-               LOGERROR << "offset:" << offset << " missing";
+               //LOGERROR << "offset:" << offset << " missing";
                return QueueResult::Failure;
            }
        }
        ++b_itr;
    }
-   LOGERROR << "offset: " << offset << " missing";
+   //LOGERROR << "offset: " << offset << " missing";
    return QueueResult::Failure;
 }
 
@@ -362,7 +362,7 @@ std::pair<bool, RequestHandle> WriteContext::pop(ObjectOffsetVal const& offset) 
                   return std::make_pair(true, val);
               }
           } else {
-              LOGERROR << "offset:" << offset << " missing";
+              //LOGERROR << "offset:" << offset << " missing";
               return no;
           }
        }

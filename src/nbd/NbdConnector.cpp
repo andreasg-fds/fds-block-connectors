@@ -35,15 +35,7 @@ extern "C" {
 #include <boost/shared_ptr.hpp>
 
 #include "connector/nbd/NbdConnection.h"
-#include "log/Log.h"
-
-namespace xdi {
-    fds_log* g_fdslog = new fds_log("NbdConnector", LOG_LOCATION, fds_log::normal);
-
-    fds_log* GetLog() {
-        return g_fdslog;
-    }
-} // namespace xdi
+//#include "log/Log.h"
 
 namespace fds {
 namespace connector {
@@ -95,17 +87,17 @@ void NbdConnector::initialize() {
     // Bind to NBD listen port
     nbdSocket = createNbdSocket();
     if (nbdSocket < 0) {
-        GLOGERROR << "could not bind to NBD port";
+        //GLOGERROR << "could not bind to NBD port";
         return;
     }
 
     // Setup event loop
     if (!evLoop && !evIoWatcher) {
-        GLOGNORMAL << "port:" << nbdPort << " accepting connections";
+        //GLOGNORMAL << "port:" << nbdPort << " accepting connections";
         evLoop = std::unique_ptr<ev::dynamic_loop>(new ev::dynamic_loop());
         evIoWatcher = std::unique_ptr<ev::io>(new ev::io());
         if (!evLoop || !evIoWatcher) {
-            GLOGERROR << "failed to initialize lib_ev";
+            //GLOGERROR << "failed to initialize lib_ev";
             return;
         }
         evIoWatcher->set(*evLoop);
@@ -160,15 +152,15 @@ void NbdConnector::reset() {
 void NbdConnector::configureSocket(int fd) const {
     // Enable Non-Blocking mode
     if (0 > fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK)) {
-        GLOGWARN << "failed to set NON-BLOCK on NBD connection";
+        //GLOGWARN << "failed to set NON-BLOCK on NBD connection";
     }
 
     // Disable Nagle's algorithm, we do our own Corking
     if (cfg_no_delay) {
-        GLOGDEBUG << "disabling Nagle's algorithm";
+        //GLOGDEBUG << "disabling Nagle's algorithm";
         int opt_val = 1;
         if (0 > setsockopt(fd, SOL_TCP, TCP_NODELAY, &opt_val, sizeof(opt_val))) {
-            GLOGWARN << "failed to set socket NON-BLOCKING on NBD connection";
+            //GLOGWARN << "failed to set socket NON-BLOCKING on NBD connection";
         }
     }
 
@@ -182,19 +174,19 @@ void NbdConnector::configureSocket(int fd) const {
 
         // Configure timeout
         if (setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &cfg_keep_alive, sizeof(cfg_keep_alive)) < 0) {
-            GLOGWARN << "failed to set KEEPALIVE_IDLE on NBD connection";
+            //GLOGWARN << "failed to set KEEPALIVE_IDLE on NBD connection";
         }
         if (setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &ka_intvl, sizeof(ka_intvl)) < 0) {
-            GLOGWARN << "failed to set KEEPALIVE_INTVL on NBD connection";
+            //GLOGWARN << "failed to set KEEPALIVE_INTVL on NBD connection";
         }
         if (setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &ka_probes, sizeof(ka_probes)) < 0) {
-            GLOGWARN << "failed to set KEEPALIVE_CNT on NBD connection";
+            //GLOGWARN << "failed to set KEEPALIVE_CNT on NBD connection";
         }
 
         // Enable KEEPALIVE on socket
         int optval = 1;
         if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0) {
-            GLOGWARN << "failed to set KEEPALIVE on NBD connection";
+            //GLOGWARN << "failed to set KEEPALIVE on NBD connection";
         }
     }
 }
@@ -203,7 +195,7 @@ void
 NbdConnector::nbdAcceptCb(ev::io &watcher, int revents) {
     if (stopping) return;
     if (EV_ERROR & revents) {
-        GLOGERROR << "invalid libev event";
+        //GLOGERROR << "invalid libev event";
         return;
     }
 
@@ -227,7 +219,7 @@ NbdConnector::nbdAcceptCb(ev::io &watcher, int revents) {
             // Create a handler for this NBD connection
             // Will delete itself when connection dies
             connection_map[clientsd] = std::make_shared<NbdConnection>(this, evLoop, clientsd, api_);
-            GLOGNORMAL << "created client connection";
+            //GLOGNORMAL << "created client connection";
         } else {
             switch (errno) {
             case ENOTSOCK:
@@ -235,7 +227,7 @@ NbdConnector::nbdAcceptCb(ev::io &watcher, int revents) {
             case EINVAL:
             case EBADF:
                 // Reinitialize server
-                GLOGWARN << "accept error:" << strerror(errno);
+                //GLOGWARN << "accept error:" << strerror(errno);
                 nbdSocket = -1;
                 initialize();
                 break;
@@ -250,14 +242,14 @@ int
 NbdConnector::createNbdSocket() {
     int listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd < 0) {
-        GLOGERROR << "failed to create NBD socket";
+        //GLOGERROR << "failed to create NBD socket";
         return listenfd;
     }
 
     // If we crash this allows us to reuse the socket before it's fully closed
     int optval = 1;
     if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-        GLOGWARN << "failed to set REUSEADDR on NBD socket";
+        //GLOGWARN << "failed to set REUSEADDR on NBD socket";
     }
 
     auto tryPort = nbdPort;
@@ -276,10 +268,10 @@ NbdConnector::createNbdSocket() {
             nbdPort = tryPort;
             break;
         }
-        GLOGWARN << "bind to listening socket failed:" << strerror(errno);
+        //GLOGWARN << "bind to listening socket failed:" << strerror(errno);
     }
     if (nbdPort != tryPort) {
-        GLOGERROR << "binding to listening socket giving up.";
+        //GLOGERROR << "binding to listening socket giving up.";
         listenfd = -1;
     }
 
@@ -292,7 +284,7 @@ NbdConnector::lead() {
     sigemptyset(&set);
     sigaddset(&set, SIGPIPE);
     if (0 != pthread_sigmask(SIG_BLOCK, &set, nullptr)) {
-        GLOGWARN << "failed to enable SIGPIPE mask on NBD server";
+        //GLOGWARN << "failed to enable SIGPIPE mask on NBD server";
     }
     evLoop->run(0);
 }

@@ -33,7 +33,7 @@
 #include "BlockTask.h"
 #include "BlockTools.h"
 #include "xdi/ApiTypes.h"
-#include "log/Log.h"
+//#include "log/Log.h"
 
 #define EMPTY_ID "0000000000000000000000000000000000000000"
 
@@ -111,7 +111,7 @@ class BlockOperations
     void finishResponse(task_type* response);
 
     std::pair<bool,std::shared_ptr<std::string>>
-     drainUpdateChain(xdi_handle const&             requestId,
+     drainUpdateChain(xdi_handle const&,
                       uint64_t const                offset);
 
     BlockTask* findResponse(uint64_t handle);
