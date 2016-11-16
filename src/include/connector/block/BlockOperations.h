@@ -33,7 +33,6 @@
 #include "BlockTask.h"
 #include "BlockTools.h"
 #include "xdi/ApiTypes.h"
-#include "log/Log.h"
 
 #define EMPTY_ID "0000000000000000000000000000000000000000"
 

@@ -25,12 +25,13 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include "assert.h"
 
 // FDS includes
 #include "connector/block/Tasks.h"
 #include "connector/block/BlockOperations.h"
 #include "connector/block/WriteContext.h"
-#include "log/Log.h"
+#include "log/Logger.h"
 
 namespace fds {
 namespace block {
@@ -105,7 +106,7 @@ BlockOperations::_executeTask(RWTask* task) {
     auto length = task->getLength();
     auto offset = task->getOffset();
     if (length == 0) {
-        LOGERROR << "handle:" << task->getProtoTask()->getHandle() << " length:" << length << " invalid";
+        LOGERROR("handle:{} length:{} invalid", task->getProtoTask()->getHandle(), length);
         task->getProtoTask()->setError(ApiErrorCode::XDI_BAD_REQUEST);
         finishResponse(task);
         return;
@@ -141,13 +142,9 @@ BlockOperations::_executeTask(RWTask* task) {
         break;
     }
 
-    LOGDEBUG << "handle:" << task->getProtoTask()->getHandle()
-             << " op:" << taskString
-             << " startoffset:" << blockRange.startBlockOffset
-             << " endoffset:" << blockRange.endBlockOffset
-             << " blocks:" << numBlocks
-             << " absoluteoffset:" << offset
-             << " length:" << length;
+    LOGDEBUG("handle:{} op:{} startoffset:{} endoffset:{} blocks:{} absoluteoffset:{} length:{}",
+            task->getProtoTask()->getHandle(), taskString, blockRange.startBlockOffset, blockRange.endBlockOffset,
+            numBlocks, offset, length);
 
     if (1 <= numBlocks) {
        ReadBlobRequest readReq;
@@ -160,11 +157,11 @@ BlockOperations::_executeTask(RWTask* task) {
 
            auto result = ctx->addReadBlob(blockRange.startBlockOffset, blockRange.endBlockOffset, task, reservedRange);
            if (WriteContext::ReadBlobResult::PENDING == result) {
-               LOGDEBUG << "handle:" << task->getProtoTask()->getHandle() << " will be restarted";
+               LOGDEBUG("handle:{} will be restarted", task->getProtoTask()->getHandle());
                // Task will be restarted
                return;
            } else if (WriteContext::ReadBlobResult::UNAVAILABLE == result) {
-               LOGDEBUG << "handle:" << task->getProtoTask()->getHandle() << " offset range unavailable";
+               LOGDEBUG("handle:{} offset range unavailable", task->getProtoTask()->getHandle());
                l.unlock();
                task->getProtoTask()->setError(ApiErrorCode::XDI_SERVICE_NOT_READY);
                finishResponse(task);
@@ -193,14 +190,14 @@ BlockOperations::drainUpdateChain
 
     auto buf = ctx->getOffsetObjectBuffer(offset);
     if (nullptr == buf) {
-        LOGERROR << "offset:" << offset << " no buffer found";
+        LOGERROR("offset:{} no buffer found", offset);
         return std::make_pair(haveNewObject, buf);
     }
 
     while (update_queued) {
         queued_task = findResponse(queued_handle.handle);
         if (queued_task) {
-            LOGTRACE << "handle:" << requestId.handle << " queued:" << queued_task->getProtoTask()->getHandle() << " offset:" << offset << " draining";
+            LOGTRACE("handle:{} queued:{} offset:{} draining", requestId.handle, queued_task->getProtoTask()->getHandle(), offset);
             auto writeTask = static_cast<WriteTask*>(queued_task);
             auto new_data = writeTask->getBuffer(queued_handle.seq);
             if (nullptr != new_data) {
@@ -257,7 +254,7 @@ BlockTask* BlockOperations::findResponse
     // returned an error
     auto it = responses.find(handle);
     if (responses.end() == it) {
-        LOGWARN << "handle:" << handle << " not waiting for response";
+        LOGWARN("handle:{} not waiting for response", handle);
         return nullptr;
     }
     return it->second;
@@ -330,9 +327,9 @@ void BlockOperations::performRead
         l.unlock();
         finishResponse(task);
     } else if (ApiErrorCode::XDI_OK == e) {
-        LOGDEBUG << "size:" << resp.blob.objects.size();
+        LOGDEBUG("size:{}", resp.blob.objects.size());
         for (auto const& o : resp.blob.objects) {
-            LOGTRACE << "offset:" << o.first << " id:" << o.second;
+            LOGTRACE("offset:{} id:{}", o.first, o.second);
         }
 
         read_map   objectsToRead;
@@ -352,7 +349,7 @@ void BlockOperations::performRead
     } else {
         readObjects.erase(itr);
         l.unlock();
-        LOGDEBUG << "error:" << static_cast<std::underlying_type<ApiErrorCode>::type>(e) << " read blob error";
+        LOGDEBUG("error:{} read blob error", static_cast<std::underlying_type<ApiErrorCode>::type>(e));
         task->getProtoTask()->setError(e);
         finishResponse(task);
     }
@@ -378,9 +375,9 @@ void BlockOperations::performWrite
     writeTask->setObjectCount(writeTask->getNumBlocks());
 
     std::unique_lock<std::mutex> l(drainChainMutex);
-    LOGDEBUG << "handle:" << requestId.handle << " numObjects:" << resp.blob.objects.size() << " startOffset:" << writeTask->getStartBlockOffset();
+    LOGDEBUG("handle:{} numObjects:{} startOffset:{}", requestId.handle, resp.blob.objects.size(), writeTask->getStartBlockOffset());
     if (false == ctx->addPendingWrite(startOffset, endOffset, task)) {
-        LOGERROR << "unable to add pending write";
+        LOGERROR("unable to add pending write");
         return;
     }
 
@@ -398,8 +395,7 @@ void BlockOperations::performWrite
             iLength = maxObjectSizeInBytes - iOff;
         }
 
-        LOGTRACE  << "offset:" << curOffset
-                  << " length:" << iLength;
+        LOGTRACE("offset:{} length:{}", curOffset, iLength);
 
         auto objBuf = (iLength == bytes->length()) ?
             bytes : std::make_shared<std::string>(*bytes, amBytesWritten, iLength);
@@ -459,12 +455,14 @@ void BlockOperations::performWriteSame
 
     OffsetInfo newOffset;
     calculateOffsets(newOffset, offset, length, maxObjectSizeInBytes);
-    GLOGIO << newOffset;
+    //TODO (andreas): fix output operator for OffsetInfo to logger
+    //    also in performUnmap
+    //LOGTRACE("{}", newOffset);
 
     std::unique_lock<std::mutex> l(drainChainMutex);
-    LOGDEBUG << "handle:" << requestId.handle << " numObjects:" << resp.blob.objects.size() << " startOffset:" << newOffset.startBlockOffset;
+    LOGDEBUG("handle:{} numObjects:{} startOffset:{}", requestId.handle, resp.blob.objects.size(), newOffset.startBlockOffset);
     if (false == ctx->addPendingWrite(newOffset.startBlockOffset, newOffset.endBlockOffset, task)) {
-        LOGERROR << "unable to add pending write";
+        LOGERROR("unable to add pending write");
         return;
     }
 
@@ -482,7 +480,7 @@ void BlockOperations::performWriteSame
     uint32_t seqId = 0;
     // Determine if we need to write a full object
     if (0 < newOffset.numFullBlocks) {
-        GLOGTRACE << "fullobjects:" << newOffset.numFullBlocks << " blockoffset:" << newOffset.fullStartBlockOffset;
+        LOGTRACE("fullobjects:{} blockoffset:{}", newOffset.numFullBlocks, newOffset.fullStartBlockOffset);
         auto writeBuf = std::make_shared<std::string>();
         for (unsigned int i = 0; i < maxObjectSizeInBytes / bufsize; ++i) {
             *writeBuf += *bytes;
@@ -497,7 +495,7 @@ void BlockOperations::performWriteSame
                 ctx->setOffsetObjectBuffer(currentOffset, writeBuf);
                 ctx->triggerWrite(currentOffset);
             } else {
-                LOGERROR << "handle:" << requestId.handle << " requires exclusive access to range";
+                LOGERROR("handle:{} requires exclusive access to range", requestId.handle);
                 return;
             }
         }
@@ -507,7 +505,7 @@ void BlockOperations::performWriteSame
     // Determine if we need a RMW for the first block
     if (0 < newOffset.startDiffOffset) {
         auto const& startBlockOffset = newOffset.startBlockOffset;
-        GLOGDEBUG << "offset:" << startBlockOffset;
+        LOGDEBUG("offset:{}", startBlockOffset);
         auto writeBuf = std::make_shared<std::string>();
         auto writeLength = (maxObjectSizeInBytes - newOffset.startDiffOffset);
         if (true == newOffset.isSingleObject()) {
@@ -521,7 +519,7 @@ void BlockOperations::performWriteSame
     // Determine if we need a RMW for the last block
     if (((false == newOffset.isSingleObject()) || (0 == newOffset.startDiffOffset)) && (0 < newOffset.endDiffOffset)) {
         auto const& endBlockOffset = newOffset.endBlockOffset;
-        GLOGDEBUG << "offset:" << endBlockOffset;
+        LOGDEBUG("offset:{}", endBlockOffset);
         auto writeBuf = std::make_shared<std::string>();
         for (unsigned int i = 0; i < (maxObjectSizeInBytes - newOffset.endDiffOffset) / bufsize; ++i) {
             *writeBuf += *bytes;
@@ -551,9 +549,9 @@ void BlockOperations::performUnmap
     auto isNewBlob = (ApiErrorCode::XDI_MISSING_BLOB == e);
 
     std::unique_lock<std::mutex> l(drainChainMutex);
-    LOGDEBUG << "handle:" << requestId.handle << " numObjects:" << resp.blob.objects.size() << " startOffset:" << totalStartBlockOffset;
+    LOGDEBUG("handle:{} numObjects:{} startOffset:{}", requestId.handle, resp.blob.objects.size(), totalStartBlockOffset);
     if (false == ctx->addPendingWrite(totalStartBlockOffset, totalEndBlockOffset, task)) {
-        LOGERROR << "unable to add pending write";
+        LOGERROR("unable to add pending write");
         return;
     }
 
@@ -564,7 +562,7 @@ void BlockOperations::performUnmap
     while (true == unmapTask->getNextRange(context, offset, length)) {
         OffsetInfo newOffset;
         calculateOffsets(newOffset, offset, length, maxObjectSizeInBytes);
-        GLOGIO << newOffset;
+        //LOGTRACE("{}", newOffset);
         if ((true == newOffset.isSingleObject()) && (length < maxObjectSizeInBytes)) {
             auto writeBuf = std::make_shared<std::string>(length, '\0');
             queuePartialWrite(requestId, resp, unmapTask, seqId, objectsToRead, objectsToWrite, writeBuf, newOffset.startBlockOffset, newOffset.startDiffOffset, isNewBlob);
@@ -592,7 +590,7 @@ void BlockOperations::performUnmap
         for (auto const& o : fullObjects) {
             auto queueResp = ctx->queue_update(o, reqId);
             if (WriteContext::QueueResult::FirstEntry != queueResp) {
-               LOGERROR << "handle:" << requestId.handle << " requires exclusive access to range";
+               LOGERROR("handle:{} requires exclusive access to range", requestId.handle);
                return;
             }
             ctx->setOffsetObjectBuffer(o, writeBuf);
@@ -657,7 +655,7 @@ void BlockOperations::writeBlobResp
     std::queue<BlockTask*> responseQueue;
     std::queue<BlockTask*> awaitingQueue;
     task->getChain(responseQueue);
-    LOGTRACE << "handle:" << requestId.handle << " queuesize:" << responseQueue.size();
+    LOGTRACE("handle:{} queuesize:{}", requestId.handle, responseQueue.size());
     respondToWrites(responseQueue, e);
     {
         std::lock_guard<std::mutex> lg(drainChainMutex);
@@ -716,12 +714,12 @@ void BlockOperations::readObjectResp
         auto readTask = static_cast<ReadTask*>(task);
         auto itr = readObjects.find(requestId.handle);
         if (readObjects.end() == itr) {
-            LOGERROR << "handle:" << requestId.handle << " missing readObject entry";
+            LOGERROR("handle:{} missing readObject entry", requestId.handle);
             return;
         } else if (ApiErrorCode::XDI_OK == e) {
             (*itr->second)[requestId.seq] = resp;
         } else {
-            LOGTRACE << "err:" << static_cast<std::underlying_type<ApiErrorCode>::type>(e) << " offset:" << readTask->getStartBlockOffset() + requestId.seq;
+            LOGTRACE("err:{} offset:{}", static_cast<std::underlying_type<ApiErrorCode>::type>(e), readTask->getStartBlockOffset() + requestId.seq);
             (*itr->second)[requestId.seq] = empty_buffer;
         }
         readTask->increaseReadBlockCount();
@@ -768,7 +766,7 @@ void BlockOperations::writeObjectResp
         } else {
             ctx->updateOffset(offset, resp);
         }
-        LOGDEBUG << "handle:" << requestId.handle << " objectId:" << resp << " offset:" << offset;
+        LOGDEBUG("handle:{} objectId:{} offset:{}", requestId.handle, resp, offset);
 
         // Unblock other updates on the same object if they exist
         bool haveNewObject {false};
@@ -789,9 +787,9 @@ void BlockOperations::writeObjectResp
             WriteBlobRequest req;
             std::queue<BlockTask*> queue;
             if (true == ctx->getWriteBlobRequest(offset, req, queue)) {
-                LOGDEBUG << "numobjects:" << req.blob.objects.size();
+                LOGDEBUG("numobjects:{}", req.blob.objects.size());
                 for (auto const& o : req.blob.objects) {
-                    LOGTRACE << "offset:" << o.first << " id:" << o.second.objectId;
+                    LOGTRACE("offset:{} id:{}", o.first, o.second.objectId);
                 }
                 task->setChain(std::move(queue));
                 l.unlock();
@@ -811,7 +809,7 @@ void BlockOperations::respondToWrites
     while (false == q.empty()) {
         auto t = q.front();
         q.pop();
-        LOGTRACE << "handle:" << t->getProtoTask()->getHandle() << " responding";
+        LOGTRACE("handle:{} responding", t->getProtoTask()->getHandle());
         t->getProtoTask()->setError(e);
         finishResponse(t);
     }

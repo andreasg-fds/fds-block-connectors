@@ -19,7 +19,7 @@
 
 #include <gtest/gtest.h>
 
-#include "log/Log.h"
+#include "log/test_log.h"
 #include "connector/block/WriteContext.h"
 
 std::string path("TestBlob");
@@ -337,15 +337,8 @@ TEST_F(TestWriteContextFixture, TestExclusiveAccess) {
     EXPECT_EQ(fds::block::WriteContext::ReadBlobResult::OK, ctx->addReadBlob(30, 35, nullptr, true));
 }
 
-namespace xdi {
-    fds_log* g_fdslog = new fds_log("gtestWriteContext", "", fds_log::trace);
-
-    fds_log* GetLog() {
-        return g_fdslog;
-    }
-} // namespace xdi
-
 int main(int argc, char* argv[]) {
     ::testing::InitGoogleTest(&argc, argv);
+    xdi::SetTestLogger(xdi::createLogger("gtestWriteContext"));
     return RUN_ALL_TESTS();
 }
