@@ -27,6 +27,10 @@
 #include "connector/scst-standalone/ScstTarget.h"
 #include "connector/scst-standalone/scst_log.h"
 
+namespace xdi {
+    std::shared_ptr<spdlog::logger> scst_logger_;
+}
+
 namespace fds {
 namespace connector {
 namespace scst {
@@ -190,7 +194,7 @@ ScstConnector::ScstConnector(std::string const& prefix,
           queue_depth(depth)
 {
     xdi::SetScstLogger(xdi::createLogger("scst"));
-    LOGINFO("ScstConnector constructor");
+    LOGDEBUG("ScstConnector constructor");
 }
 
 static auto const rediscovery_delay = std::chrono::seconds(10);

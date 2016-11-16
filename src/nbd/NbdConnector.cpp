@@ -37,6 +37,10 @@ extern "C" {
 #include "connector/nbd/NbdConnection.h"
 #include "connector/nbd/nbd_log.h"
 
+namespace xdi {
+    std::shared_ptr<spdlog::logger> nbd_logger_;
+}
+
 namespace fds {
 namespace connector {
 namespace nbd {

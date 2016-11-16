@@ -24,7 +24,7 @@
 
 namespace xdi {
 
-static std::shared_ptr<spdlog::logger> nbd_logger_;
+extern std::shared_ptr<spdlog::logger> nbd_logger_;
 
 inline static void SetNbdLogger(std::shared_ptr<spdlog::logger> logger) {
     nbd_logger_ = logger;
