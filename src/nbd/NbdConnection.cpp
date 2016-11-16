@@ -112,7 +112,6 @@ NbdConnection::NbdConnection(NbdConnector* server,
           current_response(nullptr),
           nbd_state(NbdProtoState::PREINIT)
 {
-    xdi::SetNbdLogger(xdi::createLogger("nbd"));
     memset(&attach, '\0', sizeof(attach));
     memset(&request, '\0', sizeof(request));
 

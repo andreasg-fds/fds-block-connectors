@@ -64,6 +64,7 @@ void NbdConnector::shutdown() {
 
 NbdConnector::NbdConnector(std::shared_ptr<xdi::ApiInterface> api)
         : api_(api) {
+    xdi::SetNbdLogger(xdi::createLogger("nbd"));
     initialize();
 }
 
