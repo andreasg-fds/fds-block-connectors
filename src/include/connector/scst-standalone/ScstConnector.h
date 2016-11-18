@@ -90,6 +90,7 @@ struct ScstConnector : public xdi::ApiResponseInterface
     std::mutex target_lock_;
     std::condition_variable listing_condition_;
     std::condition_variable stopping_condition_;
+    std::condition_variable done_condition_;
     std::map<volume_ptr, std::unique_ptr<ScstTarget>> targets_;
     std::set<xdi::VolumeId> black_listed_vols;
 
