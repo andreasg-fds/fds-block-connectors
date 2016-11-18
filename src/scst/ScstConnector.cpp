@@ -67,12 +67,13 @@ void ScstConnector::shutdown() {
 }
 
 void ScstConnector::terminate() {
-    std::lock_guard<std::mutex> lk(target_lock_);
+    std::unique_lock<std::mutex> lk(target_lock_);
     stopping = true;
     stopping_condition_.notify_all();
     for (auto& target_pair : targets_) {
         target_pair.second->shutdown();
     }
+    done_condition_.wait(lk, [this] () -> bool { return targets_.empty(); });
 }
 
 void ScstConnector::targetDone(const std::string target_name) {
@@ -85,6 +86,7 @@ void ScstConnector::targetDone(const std::string target_name) {
             break;
         }
     }
+    done_condition_.notify_one();
 }
 
 bool ScstConnector::addTarget(volume_ptr& volDesc) {
