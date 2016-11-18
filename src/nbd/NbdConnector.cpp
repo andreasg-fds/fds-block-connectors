@@ -32,7 +32,6 @@ extern "C" {
 }
 
 #include <ev++.h>
-#include <boost/shared_ptr.hpp>
 
 #include "connector/nbd/NbdConnection.h"
 #include "connector/nbd/nbd_log.h"

@@ -29,8 +29,6 @@ extern "C" {
 #include "connector/scst-standalone/scst_user.h"
 }
 
-#include <boost/make_shared.hpp>
-
 #include "connector/scst-standalone/scst_log.h"
 
 #include "connector/scst-standalone/ScstTask.h"
