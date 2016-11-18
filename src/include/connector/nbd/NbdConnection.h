@@ -28,7 +28,6 @@
 extern "C" {
 #include <sys/uio.h>
 }
-#include <boost/shared_ptr.hpp>
 #include <boost/lockfree/queue.hpp>
 
 #include "connector/nbd/common.h"
