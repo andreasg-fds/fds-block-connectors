@@ -65,9 +65,6 @@ struct NbdConnector : public xdi::ApiResponseInterface
     void readObjectResp(xdi_handle const&, xdi::BufferPtr const&, xdi_error const&) override {};
     void writeObjectResp(xdi_handle const&, xdi::ObjectId const&, xdi_error const&) override {};
     void deleteBlobResp(xdi_handle const&, bool const&, xdi_error const&) override {};
-    void diffBlobResp(xdi_handle const&, xdi::DiffBlobResponse const&, xdi_error const&) override {};
-    void diffAllBlobsResp(xdi_handle const&, xdi::DiffAllBlobsResponse const&, xdi_error const&) override {};
-    void diffVolumesResp(xdi_handle const&, xdi::DiffVolumesResponse const&, xdi_error const&) override {};
     void statVolumeResp(xdi_handle const&, xdi::VolumeStatusPtr const&, xdi_error const&) override {};
 
  protected:

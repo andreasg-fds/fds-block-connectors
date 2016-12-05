@@ -39,9 +39,6 @@ public:
     void readObject(Request const& requestId, ReadObjectRequest const& request) override;
     void writeObject(Request const& requestId, WriteObjectRequest const& request) override;
     void deleteBlob(Request const& requestId, BlobPath const& target) override;
-    void diffBlob(Request const& requestId, DiffBlobRequest const& request) override;
-    void diffAllBlobs(Request const& requestId, DiffAllBlobsRequest const& request) override;
-    void diffVolumes(Request const& requestId, DiffVolumesRequest const& request) override;
     void statVolume(Request const& requestId, VolumeId const volumeId) override;
     void listAllVolumes(Request const& requestId, ListAllVolumesRequest const& request) override;
 private:
@@ -69,9 +66,6 @@ public:
     virtual void readObject(Request const& requestId, ReadObjectRequest const& request) override;
     virtual void writeObject(Request const& requestId, WriteObjectRequest const& request) override;
     virtual void deleteBlob(Request const& requestId, BlobPath const& target) override;
-    virtual void diffBlob(Request const& requestId, DiffBlobRequest const& request) override;
-    virtual void diffAllBlobs(Request const& requestId, DiffAllBlobsRequest const& request) override;
-    virtual void diffVolumes(Request const& requestId, DiffVolumesRequest const& request) override;
     virtual void statVolume(Request const& requestId, VolumeId const volumeId) override;
     virtual void listAllVolumes(Request const& requestId, ListAllVolumesRequest const& request) override;
 };

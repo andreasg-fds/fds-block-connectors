@@ -100,9 +100,6 @@ class BlockOperations
     void readObjectResp(xdi_handle const& requestId, xdi::BufferPtr const& resp, xdi_error const& e) override;
     void writeObjectResp(xdi_handle const& requestId, xdi::ObjectId const& resp, xdi_error const& e) override;
     void deleteBlobResp(xdi_handle const&, bool const&, xdi_error const&) override {};
-    void diffBlobResp(xdi_handle const&, xdi::DiffBlobResponse const&, xdi_error const&) override {};
-    void diffAllBlobsResp(xdi_handle const&, xdi::DiffAllBlobsResponse const&, xdi_error const&) override {};
-    void diffVolumesResp(xdi_handle const&, xdi::DiffVolumesResponse const&, xdi_error const&) override {};
     void statVolumeResp(xdi_handle const&, xdi::VolumeStatusPtr const&, xdi_error const&) override {};
     void listAllVolumesResp(xdi_handle const&, xdi::ListAllVolumesResponse const&, xdi_error const&) override {};
 
