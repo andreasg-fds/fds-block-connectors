@@ -45,33 +45,34 @@ task deployDeb( dependsOn: 'buildDeb' ) << {
                 return
         }
 
-        def debName = 'NONE'
+        def debNames = []
         new File( 'build' ).eachFile( { f ->
                 if ( f.name.endsWith( 'deb' ) ) {
-                        debName = f.name
+                        debNames << f.name
                 }
         })
 
-        if ( debName == 'NONE' ) {
+        if ( debNames.empty ) {
                 println 'Nothing to deploy'
                 return
         }
 
-        println debName
+	debNames.each {
+		println it
 
-        def fullName = debName
+		def deploy_artifactory_local = 'curl -v -X PUT http://' + username + ':' + password + '@bld-artifactory:8081/artifactory/formation-apt/pool/nightly/' + it + ';deb.distribution=platform;deb.component=nightly;deb.architecture=amd64 -T ' + 'build/' + it
 
-        def deploy_artifactory_local = 'curl -v -X PUT http://' + username + ':' + password + '@bld-artifactory:8081/artifactory/formation-apt/pool/nightly/' + fullName + ';deb.distribution=platform;deb.component=nightly;deb.architecture=amd64 -T ' + 'build/' + fullName
+		println deploy_artifactory_local
 
-        println deploy_artifactory_local
+		def proc_local = deploy_artifactory_local.execute()
 
-        def proc_local = deploy_artifactory_local.execute()
+		proc_local.text.eachLine { line -> println line }
 
-        proc_local.text.eachLine { line -> println line }
-
-        if ( proc_local.exitValue() ) {
-                println 'Artifact upload to local artifactory failed.'
-        }
+		if ( proc_local.exitValue() ) {
+			println 'Artifact upload to local artifactory failed.'
+			return;
+		}
+	}
 }
 
 clean.dependsOn cleanBuild
