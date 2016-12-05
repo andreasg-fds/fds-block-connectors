@@ -40,9 +40,6 @@ public:
     MOCK_METHOD3(readObjectResp, void(xdi::RequestHandle const& requestId, std::shared_ptr<std::string> const& resp, xdi::ApiErrorCode const& e));
     MOCK_METHOD3(writeObjectResp, void(xdi::RequestHandle const& requestId, xdi::ObjectId const& resp, xdi::ApiErrorCode const& e));
     MOCK_METHOD3(deleteBlobResp, void(xdi::RequestHandle const& requestId, bool const& resp, xdi::ApiErrorCode const& e));
-    MOCK_METHOD3(diffBlobResp, void(xdi::RequestHandle const& requestId, xdi::DiffBlobResponse const& resp, xdi::ApiErrorCode const& e));
-    MOCK_METHOD3(diffAllBlobsResp, void(xdi::RequestHandle const& requestId, xdi::DiffAllBlobsResponse const& resp, xdi::ApiErrorCode const& e));
-    MOCK_METHOD3(diffVolumesResp, void(xdi::RequestHandle const& requestId, xdi::DiffVolumesResponse const& resp, xdi::ApiErrorCode const& e));
 };
 
 class ApiStubFixture : public ::testing::Test {

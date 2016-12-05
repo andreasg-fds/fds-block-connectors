@@ -122,33 +122,6 @@ void ApiStub::deleteBlob(Request const& requestId, BlobPath const& target) {
     }
 }
 
-void ApiStub::diffBlob(Request const& requestId, DiffBlobRequest const&) {
-    delay();
-    DiffBlobResponse resp;
-    ApiErrorCode err = ApiErrorCode::XDI_OK;
-    if (nullptr != requestId.resp) {
-        requestId.resp->diffBlobResp(requestId.id, resp, err);
-    }
-}
-
-void ApiStub::diffAllBlobs(Request const& requestId, DiffAllBlobsRequest const&) {
-    delay();
-    DiffAllBlobsResponse resp;
-    ApiErrorCode err = ApiErrorCode::XDI_OK;
-    if (nullptr != requestId.resp) {
-        requestId.resp->diffAllBlobsResp(requestId.id, resp, err);
-    }
-}
-
-void ApiStub::diffVolumes(Request const& requestId, DiffVolumesRequest const&) {
-    delay();
-    DiffVolumesResponse resp;
-    ApiErrorCode err = ApiErrorCode::XDI_OK;
-    if (nullptr != requestId.resp) {
-        requestId.resp->diffVolumesResp(requestId.id, resp, err);
-    }
-}
-
 void ApiStub::statVolume(Request const& requestId, VolumeId const) {
     auto resp = std::make_shared<VolumeStatus>();
     ApiErrorCode err = ApiErrorCode::XDI_OK;
@@ -224,27 +197,6 @@ void AsyncApiStub::writeObject(Request const& requestId, WriteObjectRequest cons
 void AsyncApiStub::deleteBlob(Request const& requestId, BlobPath const& target) {
     std::thread t([this, requestId, target]() {
         ApiStub::deleteBlob(requestId, target);
-    });
-    t.detach();
-}
-
-void AsyncApiStub::diffBlob(Request const& requestId, DiffBlobRequest const& request) {
-    std::thread t([this, requestId, request]() {
-        ApiStub::diffBlob(requestId, request);
-    });
-    t.detach();
-}
-
-void AsyncApiStub::diffAllBlobs(Request const& requestId, DiffAllBlobsRequest const& request) {
-    std::thread t([this, requestId, request]() {
-        ApiStub::diffAllBlobs(requestId, request);
-    });
-    t.detach();
-}
-
-void AsyncApiStub::diffVolumes(Request const& requestId, DiffVolumesRequest const& request) {
-    std::thread t([this, requestId, request]() {
-        ApiStub::diffVolumes(requestId, request);
     });
     t.detach();
 }
