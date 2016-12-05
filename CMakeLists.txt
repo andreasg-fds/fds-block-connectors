@@ -46,7 +46,7 @@ find_library (LIB_CONFIGPP config++ PATHS "${EXTERN_FDS_LIBS}")
 add_subdirectory (src)
 
 set (CPACK_PACKAGE_NAME			"${PROJECT_NAME}-${CPACK_PACKAGE_VERSION}")
-set (CPACK_DEB_COMPONENT_INSTALL ON)
+#set (CPACK_DEB_COMPONENT_INSTALL ON)
 set (CPACK_DEBIAN_PACKAGE_ARCHITECTURE	"amd64")
 set (CPACK_DEBIAN_PACKAGE_DESCRIPTION	"Block connectors for Formation One")
 set (CPACK_DEBIAN_PACKAGE_MAINTAINER	"Brian Szmyd <szmyd@formationds.com>")
