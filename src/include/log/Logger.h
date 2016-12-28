@@ -45,8 +45,14 @@ constexpr const char* file_name(const char* str) {
 #define LINEOUTPUTFORMAT "[{}:{}:{}] "
 #define LINEOUTPUTARGS file_name(__FILE__), __LINE__, __FUNCTION__
 
+#ifdef DEBUG
 #define LOGTRACE(msg, ...)     LOGGER->trace(LINEOUTPUTFORMAT msg, LINEOUTPUTARGS, ##__VA_ARGS__)
 #define LOGDEBUG(msg, ...)     LOGGER->debug(LINEOUTPUTFORMAT msg, LINEOUTPUTARGS, ##__VA_ARGS__)
+#else
+#define LOGTRACE(msg, ...)     
+#define LOGDEBUG(msg, ...)     
+#endif
+
 #define LOGINFO(msg, ...)      LOGGER->info(LINEOUTPUTFORMAT msg, LINEOUTPUTARGS, ##__VA_ARGS__)
 #define LOGWARN(msg, ...)      LOGGER->warn(LINEOUTPUTFORMAT msg, LINEOUTPUTARGS, ##__VA_ARGS__)
 #define LOGERROR(msg, ...)     LOGGER->error(LINEOUTPUTFORMAT msg, LINEOUTPUTARGS, ##__VA_ARGS__)
@@ -62,7 +68,7 @@ inline static std::shared_ptr<spdlog::logger> createLogger(std::string const& na
     std::call_once(initLogger, [] () mutable
     {
         spdlog::set_async_mode(queue_size, spdlog::async_overflow_policy::block_retry, nullptr, std::chrono::seconds(2));
-        spdlog::set_level(spdlog::level::debug);
+        spdlog::set_level(spdlog::level::info);
         spdlog::set_pattern("[%D %H:%M:%S.%f] [%l] [%t] %v");
     });
     std::string path = "/opt/fds/formation_one/var/logs/" + name + "_log";

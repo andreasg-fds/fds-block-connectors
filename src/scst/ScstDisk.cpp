@@ -168,16 +168,14 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
     case READ_12:
     case READ_16:
         {
-            // If we are anything but READ_6 read the PR and FUA bits
-            bool fua = false;
+            // If we are anything but READ_6 read the PR bit
             uint8_t rdprotect = 0x00;
             if (READ_6 != op_code) {
                 rdprotect = (0x07 & (scsi_cmd.cdb[1] >> 5));
-                fua = (0x00 != (scsi_cmd.cdb[1] & 0x08));
             }
 
-            LOGTRACE("iotype:read lba:{} length:{} fua:{} pr:{} handle:{}",
-                    scsi_cmd.lba, scsi_cmd.bufflen, fua, (uint32_t)rdprotect, cmd->cmd_h);
+            LOGTRACE("iotype:read lba:{} length:{} pr:{} handle:{}",
+                    scsi_cmd.lba, scsi_cmd.bufflen, (uint32_t)rdprotect, cmd->cmd_h);
 
             // We do not support rdprotect data
             if (0x00 != rdprotect) {
@@ -225,16 +223,14 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
     case WRITE_12:
     case WRITE_16:
         {
-            // If we are anything but READ_6 read the PR and FUA bits
-            bool fua = false;
+            // If we are anything but READ_6 read the PR bit
             uint8_t wrprotect = 0x00;
             if (WRITE_6 != op_code) {
                 wrprotect = (0x07 & (scsi_cmd.cdb[1] >> 5));
-                fua = (0x00 != (scsi_cmd.cdb[1] & 0x08));
             }
 
-            LOGTRACE("iotype:write lba:{} length:{} fua:{} pr:{} handle:{}",
-                    scsi_cmd.lba, scsi_cmd.bufflen, fua, (uint32_t)wrprotect, cmd->cmd_h);
+            LOGTRACE("iotype:write lba:{} length:{} pr:{} handle:{}",
+                    scsi_cmd.lba, scsi_cmd.bufflen, (uint32_t)wrprotect, cmd->cmd_h);
 
             // We do not support wrprotect data
             if (0x00 != wrprotect) {
@@ -262,7 +258,11 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
         {
            bool unmap = (0 != (scsi_cmd.cdb[1] & 0x08));
            bool ndob = (0 != (scsi_cmd.cdb[1] & 0x01));
-           uint32_t lbas = be32toh(*(uint32_t*)(scsi_cmd.cdb + 10));
+           union { uint8_t bytes[4]; uint32_t be_lbas; } lba_union;
+           for (auto i = 0; 4 > i; ++i) {
+               lba_union.bytes[i] = *(scsi_cmd.cdb + 10 + i);
+           }
+           uint32_t lbas = be32toh(lba_union.be_lbas);
 
            LOGDEBUG("WriteSame:{} length:{} ndob:{} unmap:{} lbs:{}",
                    scsi_cmd.lba, scsi_cmd.bufflen, ndob, unmap, lbas);
@@ -302,12 +302,8 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
         break;
     case UNMAP:
         {
-            bool anchored = (0 != (scsi_cmd.cdb[1] & 0x01));
-            auto listLength = be16toh(*(uint16_t*)(scsi_cmd.cdb + 7));
-            auto unmap_data_length = be16toh(*(uint16_t*)(buffer));
             auto unmap_block_descriptor_data_length = be16toh(*(uint16_t*)(buffer + 2));
-            LOGDEBUG("unmap:{} anchored:{} unmapdatalength:{} unmapblockdescriptordatalength:{}",
-                    listLength, anchored, unmap_data_length, unmap_block_descriptor_data_length);
+            LOGDEBUG("unmapblockdescriptordatalength:{}", unmap_block_descriptor_data_length);
             fds::block::UnmapTask::unmap_vec_ptr write_vec(new fds::block::UnmapTask::unmap_vec);
             for (int i = 8; i < 8 + unmap_block_descriptor_data_length && i + 16 <= unmap_block_descriptor_data_length + 8; i += 16) {
                 auto unmap_lba = be64toh(*(uint64_t*)(buffer + i));

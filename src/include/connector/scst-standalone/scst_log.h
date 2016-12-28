@@ -30,10 +30,6 @@ inline static void SetScstLogger(std::shared_ptr<spdlog::logger> logger) {
     scst_logger_ = logger;
 }
 
-inline std::shared_ptr<spdlog::logger> GetLogger() {
-    return scst_logger_;
-}
-
 }  // namespace xdi
 
 #endif // SCST_SCSTLOG_H_

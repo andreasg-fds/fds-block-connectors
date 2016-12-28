@@ -177,7 +177,11 @@ BlockOperations::_executeTask(RWTask* task) {
 std::pair<bool,std::shared_ptr<std::string>>
 BlockOperations::drainUpdateChain
 (
+#ifdef DEBUG
   RequestHandle const&          requestId,
+#else
+  RequestHandle const&,
+#endif
   uint64_t const                offset
 )
 {
@@ -328,9 +332,6 @@ void BlockOperations::performRead
         finishResponse(task);
     } else if (ApiErrorCode::XDI_OK == e) {
         LOGDEBUG("size:{}", resp.blob.objects.size());
-        for (auto const& o : resp.blob.objects) {
-            LOGTRACE("offset:{} id:{}", o.first, o.second);
-        }
 
         read_map   objectsToRead;
         write_map  objectsToWrite;
@@ -788,9 +789,6 @@ void BlockOperations::writeObjectResp
             std::queue<BlockTask*> queue;
             if (true == ctx->getWriteBlobRequest(offset, req, queue)) {
                 LOGDEBUG("numobjects:{}", req.blob.objects.size());
-                for (auto const& o : req.blob.objects) {
-                    LOGTRACE("offset:{} id:{}", o.first, o.second.objectId);
-                }
                 task->setChain(std::move(queue));
                 l.unlock();
                 Request r{requestId, RequestType::WRITE_BLOB_TYPE, this};
