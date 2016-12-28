@@ -191,7 +191,9 @@ TEST(BlockToolsTest, ZeroMaxObjectSize) {
 
 TEST(BlockToolsTest, ZeroLength) {
     fds::block::OffsetInfo oi;
+#ifdef DEBUG
     EXPECT_DEATH(calculateOffsets(oi, 2147614720, 0, 131072), "length != 0");
+#endif
 }
 
 int main(int argc, char* argv[]) {

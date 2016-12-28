@@ -30,10 +30,6 @@ inline static void SetNbdLogger(std::shared_ptr<spdlog::logger> logger) {
     nbd_logger_ = logger;
 }
 
-inline std::shared_ptr<spdlog::logger> GetLogger() {
-    return nbd_logger_;
-}
-
 }  // namespace xdi
 
 #endif // NBD_NBDLOG_H_

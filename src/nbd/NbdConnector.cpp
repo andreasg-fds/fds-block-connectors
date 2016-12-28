@@ -38,6 +38,10 @@ extern "C" {
 
 namespace xdi {
     std::shared_ptr<spdlog::logger> nbd_logger_;
+
+    std::shared_ptr<spdlog::logger> GetLogger() {
+        return nbd_logger_;
+    }
 }
 
 namespace fds {

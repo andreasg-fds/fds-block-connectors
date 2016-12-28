@@ -29,6 +29,10 @@
 
 namespace xdi {
     std::shared_ptr<spdlog::logger> scst_logger_;
+
+    std::shared_ptr<spdlog::logger> GetLogger() {
+        return scst_logger_;
+    }
 }
 
 namespace fds {

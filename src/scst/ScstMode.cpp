@@ -64,8 +64,8 @@ ModeHandler::ModeHandler()
 
 void ModeHandler::setBlockDescriptor(size_t const lba_count, size_t const lba_size)
 {
-    *reinterpret_cast<uint32_t*>(&_block_descriptor._density_code) = htobe32(std::min(lba_count, (uint64_t)UINT_MAX));
-    *reinterpret_cast<uint32_t*>(&_block_descriptor._reserved) = htobe32(lba_size);
+    _block_descriptor._number_of_blocks = htobe32(std::min(lba_count, (uint64_t)UINT_MAX));
+    _block_descriptor._block_length = htobe32(lba_size);
 }
 
 size_t ModeHandler::writePage(ScstTask* task, size_t& offset, uint8_t const page_code) const
