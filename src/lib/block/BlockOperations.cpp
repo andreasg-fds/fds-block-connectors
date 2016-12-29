@@ -207,7 +207,8 @@ BlockOperations::drainUpdateChain
             if (nullptr != new_data) {
                 if (maxObjectSizeInBytes > new_data->length()) {
                     new_data = writeTask->handleRMWResponse(buf,
-                                                            queued_handle.seq);
+                                                            queued_handle.seq,
+                                                            haveNewObject);
                 }
                 buf = new_data;
                 haveNewObject = true;

@@ -69,7 +69,8 @@ ReadTask::handleReadResponse(std::vector<std::shared_ptr<std::string>>& buffers,
 
 std::shared_ptr<std::string>
 WriteTask::handleRMWResponse(std::shared_ptr<std::string> const& retBuf,
-                             sequence_type seqId) {
+                             sequence_type seqId,
+                             bool const mutable_buffer) {
 
     auto w_itr = writeOffsetInBlockMap.find(seqId);
     uint32_t iOff = (w_itr != writeOffsetInBlockMap.end()) ? w_itr->second % maxObjectSizeInBytes : 0;
@@ -82,9 +83,13 @@ WriteTask::handleRMWResponse(std::shared_ptr<std::string> const& retBuf,
         fauxBytes->replace(iOff, writeBytes->length(),
                            writeBytes->c_str(), writeBytes->length());
     } else {
-        // Need to copy retBut into a modifiable buffer since retBuf is owned
-        // by the connector and should not be modified here.
-        fauxBytes = std::make_shared<std::string>(retBuf->c_str(), retBuf->length());
+        if (!mutable_buffer) {
+            // Need to copy retBut into a modifiable buffer since retBuf is owned
+            // by the connector and should not be modified here.
+            fauxBytes = std::make_shared<std::string>(retBuf->c_str(), retBuf->length());
+        } else {
+            fauxBytes = retBuf;
+        }
         fauxBytes->replace(iOff, writeBytes->length(),
                            writeBytes->c_str(), writeBytes->length());
     }
