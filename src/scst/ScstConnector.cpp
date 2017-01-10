@@ -235,6 +235,7 @@ ScstConnector::listAllVolumesResp(xdi::RequestHandle const&,
             xdi::VolumeDescriptorVisitor v;
             for (auto const& vol : resp.volumes) {
                 if ((xdi::VolumeType::ISCSI_VOLUME_TYPE == vol->match(&v)) &&
+                    (vol->allowMount) &&
                     (0 == black_listed_vols.count(vol->volumeId)) &&
                     (validateTargetName(vol->volumeName)))
                 {

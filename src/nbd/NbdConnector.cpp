@@ -312,7 +312,7 @@ NbdConnector::listAllVolumesResp(xdi::RequestHandle const&, xdi::ListAllVolumesR
         volume_id_map.clear();
         for (auto const& vol : resp.volumes) {
             xdi::VolumeDescriptorVisitor v;
-            if ((xdi::VolumeType::ISCSI_VOLUME_TYPE == vol->match(&v))) {
+            if ((xdi::VolumeType::ISCSI_VOLUME_TYPE == vol->match(&v)) && vol->allowMount) {
                 auto currVol = std::static_pointer_cast<xdi::IscsiVolumeDescriptor>(vol);
                 volume_id_map.emplace(std::make_pair(vol->volumeName, currVol));
             }
