@@ -34,7 +34,7 @@
 #include "BlockTools.h"
 #include "xdi/ApiTypes.h"
 
-#define EMPTY_ID "0000000000000000000000000000000000000000"
+#define EMPTY_ID "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
 namespace xdi {
     class ApiInterface;
