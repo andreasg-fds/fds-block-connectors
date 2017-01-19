@@ -42,7 +42,7 @@ int expected {0};
 
 class TestConnector : public fds::block::BlockOperations {
 public:
-    TestConnector(std::shared_ptr<xdi::ApiInterface> interface, bool multi) : fds::block::BlockOperations(interface), isMultithreaded(multi) {}
+    TestConnector(std::shared_ptr<xdi::ApiInterface> interface, bool multi) : fds::block::BlockOperations(interface, 16), isMultithreaded(multi) {}
     ~TestConnector() {}
 
     bool verifyBuffers(std::vector<std::shared_ptr<std::string>>& bufs) {

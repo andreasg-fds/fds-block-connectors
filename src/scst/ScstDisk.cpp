@@ -53,7 +53,7 @@ ScstDisk::ScstDisk(volume_ptr& vol_desc,
                    ScstTarget* target,
                    std::shared_ptr<xdi::ApiInterface> api)
         : ScstDevice(vol_desc->volumeName, target),
-          fds::block::BlockOperations(api),
+          fds::block::BlockOperations(api, 16),
           volume_id(vol_desc->volumeId),
           logical_block_size(512ul)
 {
@@ -183,7 +183,7 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
                 continue;
             }
 
-            auto readTask = new fds::block::ReadTask(task);
+            auto readTask = acquireReadTask(task);
 
             uint64_t offset = scsi_cmd.lba * logical_block_size;
             readTask->set(offset, scsi_cmd.bufflen);
@@ -238,7 +238,7 @@ void ScstDisk::execDeviceCmd(ScstTask* task) {
                 continue;
             }
 
-            auto writeTask = new fds::block::WriteTask(task);
+            auto writeTask = acquireWriteTask(task);
 
             uint64_t offset = scsi_cmd.lba * logical_block_size;
             writeTask->set(offset, scsi_cmd.bufflen);
@@ -376,12 +376,13 @@ void ScstDisk::respondTask(fds::block::BlockTask* response) {
     auto task = static_cast<ScstTask*>(response->getProtoTask());
     auto const& err = response->getProtoTask()->getError();
     fds::block::TaskVisitor v;
+    auto task_type = response->match(&v);
     if (xdi::ApiErrorCode::XDI_OK != err) {
         if (xdi::ApiErrorCode::XDI_MISSING_VOLUME == err) {
             // Volume may have been removed, shutdown and destroy target
             LOGINFO("lun destroyed");
             task->checkCondition(SCST_LOAD_SENSE(scst_sense_lun_not_supported));
-        } else if ((fds::block::TaskType::READ == response->match(&v)) &&
+        } else if ((fds::block::TaskType::READ == task_type) &&
                    (false == isRetryable(err))) {
             auto btask = static_cast<fds::block::ReadTask*>(response);
             LOGCRITICAL("iotype:read handle:{} offset:{} length:{} had critical failure",
@@ -403,7 +404,7 @@ void ScstDisk::respondTask(fds::block::BlockTask* response) {
                     task->getHandle());
             task->checkCondition(SCST_LOAD_SENSE(scst_sense_internal_failure));
         }
-    } else if (fds::block::TaskType::READ == response->match(&v)) {
+    } else if (fds::block::TaskType::READ == task_type) {
         auto btask = static_cast<fds::block::ReadTask*>(response);
         auto buffer = task->getResponseBuffer();
         uint32_t i = 0, context = 0;
@@ -418,6 +419,22 @@ void ScstDisk::respondTask(fds::block::BlockTask* response) {
 
     // add to queue
     readyResponses.push(task);
+
+    switch (task_type) {
+        case fds::block::TaskType::READ:
+            {
+            returnReadTask(static_cast<fds::block::ReadTask*>(response));
+            break;;
+            }
+        case fds::block::TaskType::WRITE:
+            {
+            returnWriteTask(static_cast<fds::block::WriteTask*>(response));
+            break;;
+            }
+        default:
+            delete response;
+            break;;
+    }
 
     // We have something to write, so poke the loop
     devicePoke();

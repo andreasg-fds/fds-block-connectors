@@ -46,8 +46,10 @@ static std::mutex assoc_map_lock {};
 
 static const uint32_t ZERO_OFFSET = 0;
 
-BlockOperations::BlockOperations(std::shared_ptr<ApiInterface> interface)
-        : volumeName(nullptr),
+BlockOperations::BlockOperations(std::shared_ptr<ApiInterface> interface, size_t const pool_size)
+        : read_task_pool(pool_size),
+          write_task_pool(pool_size),
+          volumeName(nullptr),
           blobName(new std::string("BlockBlob")),
           domainName(new std::string("TestDomain")),
           blobMode(new int32_t(0)),
@@ -235,7 +237,6 @@ void BlockOperations::finishResponse
     }
     if (response_removed) {
         respondTask(response);
-        delete response;
     }
 }
 
@@ -812,6 +813,29 @@ void BlockOperations::respondToWrites
         t->getProtoTask()->setError(e);
         finishResponse(t);
     }
+}
+
+ReadTask* BlockOperations::acquireReadTask(ProtoTask* p_task) {
+    ReadTask* ret_val;
+    if (read_task_pool.empty()) {
+        ret_val = new ReadTask(p_task);
+    } else {
+        read_task_pool.pop(ret_val);
+        ret_val->resetTask(p_task);
+    }
+    return ret_val;
+}
+
+
+WriteTask* BlockOperations::acquireWriteTask(ProtoTask* p_task) {
+    WriteTask* ret_val;
+    if (write_task_pool.empty()) {
+        ret_val = new WriteTask(p_task);
+    } else {
+        write_task_pool.pop(ret_val);
+        ret_val->resetTask(p_task);
+    }
+    return ret_val;
 }
 
 }  // namespace block

@@ -99,7 +99,7 @@ NbdConnection::NbdConnection(NbdConnector* server,
                              std::shared_ptr<ev::dynamic_loop> loop,
                              int clientsd,
                              std::shared_ptr<xdi::ApiInterface> api)
-        : fds::block::BlockOperations(api),
+        : fds::block::BlockOperations(api, 16),
           clientSocket(clientsd),
           volume_size{0},
           object_size{0},
@@ -408,7 +408,7 @@ NbdConnection::dispatchOp() {
         case NBD_CMD_READ:
             {
                 auto ptask = new NbdTask(handle);
-                auto task = new fds::block::ReadTask(ptask);
+                auto task = acquireReadTask(ptask);
                 task->set(offset, length);
                 executeTask(task);
             }
@@ -417,7 +417,7 @@ NbdConnection::dispatchOp() {
             {
                 assert(request.data);
                 auto ptask = new NbdTask(handle);
-                auto task = new fds::block::WriteTask(ptask);
+                auto task = acquireWriteTask(ptask);
                 task->set(offset, length);
                 task->setWriteBuffer(request.data);
                 executeTask(task);
@@ -519,13 +519,26 @@ void
 NbdConnection::respondTask(fds::block::BlockTask* response) {
     auto task = static_cast<NbdTask*>(response->getProtoTask());
     fds::block::TaskVisitor v;
-    if (fds::block::TaskType::READ == response->match(&v)) {
+    auto task_type = response->match(&v);
+    if (fds::block::TaskType::READ == task_type) {
         auto btask = static_cast<fds::block::ReadTask*>(response);
         task->setRead();
         btask->swapReadBuffers(task->getBufVec());
     }
     // add to queue
     readyResponses.push(task);
+
+    switch (task_type) {
+        case fds::block::TaskType::READ:
+            returnReadTask(static_cast<fds::block::ReadTask*>(response));
+            break;;
+        case fds::block::TaskType::WRITE:
+            returnWriteTask(static_cast<fds::block::WriteTask*>(response));
+            break;;
+        default:
+            delete response;
+            break;;
+    }
 
     // We have something to write, so poke the loop
     asyncWatcher->send();

@@ -55,6 +55,14 @@ struct RWTask : public BlockTask {
         offVec.reserve(count);
     }
 
+    void resetTask(ProtoTask* new_task) override {
+        BlockTask::resetTask(new_task);
+        offset = 0;
+        length = 0;
+        bufVec.clear();
+        offVec.clear();
+    }
+
 private:
     uint64_t offset {0};
     uint32_t length {0};
@@ -88,6 +96,11 @@ struct ReadTask : public RWTask {
      */
     void handleReadResponse(std::vector<buffer_ptr_type>& buffers,
                             buffer_ptr_type& empty_buffer);
+
+    void resetTask(ProtoTask* new_task) override {
+        RWTask::resetTask(new_task);
+        readObjectCount = 0;
+    }
 
 private:
     uint32_t readObjectCount {0};
@@ -123,6 +136,14 @@ struct WriteTask : public RWTask {
         handleRMWResponse(buffer_ptr_type const& retBuf,
                           sequence_type seqId,
                           bool const mutable_buffer = false);
+
+    void resetTask(ProtoTask* new_task) override {
+        RWTask::resetTask(new_task);
+        writeBuffer.reset();
+        writeOffsetInBlockMap.clear();
+        repeatingBlock = 0;
+        hasRepeatingBlock = false;
+    }
 
 private:
     std::shared_ptr<std::string>  writeBuffer;

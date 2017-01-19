@@ -81,6 +81,13 @@ struct BlockTask {
     virtual TaskType match(const TaskVisitor* v) = 0;
 
     ProtoTask* getProtoTask() { return protoTask; }
+    virtual void resetTask(ProtoTask* new_task) {
+        protoTask = new_task;
+        if (!chainedResponses.empty()) {
+            chainedResponses = std::queue<BlockTask*>();
+        }
+    }
+
     void setError(xdi::ApiErrorCode const& error) { if (nullptr != protoTask) protoTask->setError(error); }
 
   private:

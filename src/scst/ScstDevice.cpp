@@ -64,7 +64,7 @@ namespace scst {
 
 ScstDevice::ScstDevice(std::string const&  device_name,
                        ScstTarget*        target)
-        : readyResponses(4000),
+        : readyResponses(max_cmd_transfer),
           inquiry_handler(new InquiryHandler()),
           mode_handler(new ModeHandler()),
           volumeName(device_name),

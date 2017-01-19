@@ -29,10 +29,12 @@
 #include <memory>
 #include <queue>
 
-#include "xdi/ApiResponseInterface.h"
+#include <boost/lockfree/queue.hpp>
+
+#include <xdi/ApiTypes.h>
+#include <xdi/ApiResponseInterface.h>
 #include "BlockTask.h"
 #include "BlockTools.h"
-#include "xdi/ApiTypes.h"
 
 #define EMPTY_ID "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
@@ -74,7 +76,7 @@ class BlockOperations
     typedef std::unordered_map<int64_t, task_type*> response_map_type;
   public:
 
-    BlockOperations(std::shared_ptr<xdi::ApiInterface> interface);
+    BlockOperations(std::shared_ptr<xdi::ApiInterface> interface, size_t const pool_size);
     explicit BlockOperations(BlockOperations const& rhs) = delete;
     BlockOperations& operator=(BlockOperations const& rhs) = delete;
     ~BlockOperations() = default;
@@ -105,6 +107,17 @@ class BlockOperations
     void diffVolumesResp(xdi_handle const&, xdi::DiffVolumesResponse const&, xdi_error const&) override {};
     void statVolumeResp(xdi_handle const&, xdi::VolumeStatusPtr const&, xdi_error const&) override {};
     void listAllVolumesResp(xdi_handle const&, xdi::ListAllVolumesResponse const&, xdi_error const&) override {};
+
+  protected:
+
+    boost::lockfree::queue<ReadTask*> read_task_pool;
+    boost::lockfree::queue<WriteTask*> write_task_pool;
+
+    ReadTask* acquireReadTask(ProtoTask* p_task);
+    WriteTask* acquireWriteTask(ProtoTask* p_task);
+
+    void returnReadTask(ReadTask* task)     { read_task_pool.push(task); }
+    void returnWriteTask(WriteTask* task)   { write_task_pool.push(task); }
 
   private:
     void finishResponse(task_type* response);
