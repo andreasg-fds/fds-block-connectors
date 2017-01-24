@@ -64,6 +64,7 @@ struct ScstConnector : public xdi::ApiResponseInterface
 
     void listAllVolumesResp(xdi_handle const& requestId, xdi::ListAllVolumesResponse const& resp, xdi_error const& e) override;
     void listResp(xdi_handle const&, xdi::ListBlobsResponse const&, xdi_error const&) override {};
+    void enumBlobsResp(xdi_handle const&, xdi::EnumBlobsResponse const&, xdi_error const&) override {};
     void readVolumeMetaResp(xdi_handle const&, xdi::VolumeMetadata const&, xdi_error const&) override {}
     void writeVolumeMetaResp(xdi_handle const&, bool const&, xdi_error const&) override {}
     void readBlobResp(xdi_handle const&, xdi::ReadBlobResponse const&, xdi_error const&) override {};

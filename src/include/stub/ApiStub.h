@@ -30,6 +30,7 @@ public:
     ApiStub(std::shared_ptr<FdsStub> stub, uint32_t delay);
 
     void list(Request const& requestId, ListBlobsRequest const& request) override;
+    void enumBlobs(Request const& requestId, EnumBlobsRequest const& request) override;
     void readVolumeMeta(Request const& requestId, VolumeId const volumeId) override;
     void writeVolumeMeta(Request const& requestId, WriteMetadataRequest const& request) override;
     void readBlob(Request const& requestId, ReadBlobRequest const& request) override;

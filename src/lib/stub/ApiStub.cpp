@@ -44,6 +44,15 @@ void ApiStub::list(Request const& requestId, ListBlobsRequest const&) {
     }
 }
 
+void ApiStub::enumBlobs(Request const& requestId, EnumBlobsRequest const&) {
+    delay();
+    EnumBlobsResponse resp;
+    ApiErrorCode err = ApiErrorCode::XDI_OK;
+    if (nullptr != requestId.resp) {
+        requestId.resp->enumBlobsResp(requestId.id, resp, err);
+    }
+}
+
 void ApiStub::readVolumeMeta(Request const& requestId, VolumeId const) {
     delay();
     VolumeMetadata resp;
