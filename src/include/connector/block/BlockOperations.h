@@ -36,8 +36,6 @@
 #include "BlockTask.h"
 #include "BlockTools.h"
 
-#define EMPTY_ID "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-
 namespace xdi {
     class ApiInterface;
 }

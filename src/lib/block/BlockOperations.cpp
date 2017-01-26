@@ -33,6 +33,8 @@
 #include "connector/block/WriteContext.h"
 #include "log/Logger.h"
 
+static std::string const EMPTY_ID(20, '\0');
+
 namespace fds {
 namespace block {
 
