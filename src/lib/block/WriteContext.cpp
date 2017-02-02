@@ -303,7 +303,7 @@ bool WriteContext::getWriteBlobRequest(ObjectOffsetVal const& offset, WriteBlobR
     return false;
 }
 
-bool WriteContext::failWriteBlobRequest(ObjectOffsetVal const& offset, PendingTasks& queue) {
+bool WriteContext::failWriteRequest(ObjectOffsetVal const& offset, PendingTasks& queue) {
     auto itr = _pendingBlobWrites.begin();
     while (_pendingBlobWrites.end() != itr) {
         if ((offset >= itr->first) && (offset < itr->first + itr->second.numObjects)) {

@@ -354,7 +354,7 @@ void BlockOperations::performRead
     } else {
         readObjects.erase(itr);
         l.unlock();
-        LOGDEBUG("error:{} read blob error", static_cast<std::underlying_type<ApiErrorCode>::type>(e));
+        LOGERROR("handle:{} error:{} read blob error", requestId.handle, static_cast<std::underlying_type<ApiErrorCode>::type>(e));
         task->getProtoTask()->setError(e);
         finishResponse(task);
     }
@@ -386,53 +386,61 @@ void BlockOperations::performWrite
         return;
     }
 
-    size_t amBytesWritten = 0;
-    uint32_t seqId = 0;
-    read_map objectsToRead;
-    write_map objectsToWrite;
-    while (amBytesWritten < length) {
-        uint64_t curOffset = offset + amBytesWritten;
-        uint64_t objectOff = curOffset / maxObjectSizeInBytes;
-        uint32_t iOff = curOffset % maxObjectSizeInBytes;
-        size_t iLength = length - amBytesWritten;
+    if ((ApiErrorCode::XDI_OK != e) && (ApiErrorCode::XDI_MISSING_BLOB != e)) {
+        LOGERROR("handle:{} error:{} read blob error", requestId.handle, static_cast<std::underlying_type<ApiErrorCode>::type>(e));
+        std::queue<BlockTask*> queue;
+        ctx->failWriteRequest(startOffset, queue);
+        l.unlock();
+        respondToWrites(queue, e);
+    } else {
+        size_t amBytesWritten = 0;
+        uint32_t seqId = 0;
+        read_map objectsToRead;
+        write_map objectsToWrite;
+        while (amBytesWritten < length) {
+            uint64_t curOffset = offset + amBytesWritten;
+            uint64_t objectOff = curOffset / maxObjectSizeInBytes;
+            uint32_t iOff = curOffset % maxObjectSizeInBytes;
+            size_t iLength = length - amBytesWritten;
 
-        if ((iLength + iOff) >= maxObjectSizeInBytes) {
-            iLength = maxObjectSizeInBytes - iOff;
-        }
+            if ((iLength + iOff) >= maxObjectSizeInBytes) {
+                iLength = maxObjectSizeInBytes - iOff;
+            }
 
-        LOGTRACE("offset:{} length:{}", curOffset, iLength);
+            LOGTRACE("offset:{} length:{}", curOffset, iLength);
 
-        auto objBuf = (iLength == bytes->length()) ?
-            bytes : std::make_shared<std::string>(*bytes, amBytesWritten, iLength);
+            auto objBuf = (iLength == bytes->length()) ?
+                bytes : std::make_shared<std::string>(*bytes, amBytesWritten, iLength);
 
-        auto partial_write = (iLength != maxObjectSizeInBytes);
-        if (true == partial_write) {
-           queuePartialWrite(requestId, resp, writeTask, seqId, objectsToRead, objectsToWrite, objBuf, objectOff, iOff, isNewBlob);
-        } else {
-           writeTask->keepBufferForWrite(seqId, objectOff, ZERO_OFFSET, objBuf);
-           xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
-           auto queueResp = ctx->queue_update(objectOff, reqId);
-           if (WriteContext::QueueResult::FirstEntry == queueResp) {
-              ctx->setOffsetObjectBuffer(objectOff, objBuf);
-              ctx->triggerWrite(objectOff);
-              objectsToWrite.emplace(seqId, objBuf);
-           } else if (WriteContext::QueueResult::UpdateStable == queueResp) {
-               bool haveNewObject {false};
-               std::shared_ptr<std::string> newBuf;
-               std::tie(haveNewObject, newBuf) = drainUpdateChain(requestId, objectOff);
+            auto partial_write = (iLength != maxObjectSizeInBytes);
+            if (true == partial_write) {
+               queuePartialWrite(requestId, resp, writeTask, seqId, objectsToRead, objectsToWrite, objBuf, objectOff, iOff, isNewBlob);
+            } else {
+               writeTask->keepBufferForWrite(seqId, objectOff, ZERO_OFFSET, objBuf);
+               xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
+               auto queueResp = ctx->queue_update(objectOff, reqId);
+               if (WriteContext::QueueResult::FirstEntry == queueResp) {
+                  ctx->setOffsetObjectBuffer(objectOff, objBuf);
+                  ctx->triggerWrite(objectOff);
+                  objectsToWrite.emplace(seqId, objBuf);
+               } else if (WriteContext::QueueResult::UpdateStable == queueResp) {
+                   bool haveNewObject {false};
+                   std::shared_ptr<std::string> newBuf;
+                   std::tie(haveNewObject, newBuf) = drainUpdateChain(requestId, objectOff);
 
-               if (true == haveNewObject) {
-                   ctx->setOffsetObjectBuffer(objectOff, newBuf);
-                   ctx->triggerWrite(objectOff);
-                   objectsToWrite.emplace(seqId, newBuf);
+                   if (true == haveNewObject) {
+                       ctx->setOffsetObjectBuffer(objectOff, newBuf);
+                       ctx->triggerWrite(objectOff);
+                       objectsToWrite.emplace(seqId, newBuf);
+                   }
                }
-           }
-           ++seqId;
+               ++seqId;
+            }
+            amBytesWritten += iLength;
         }
-        amBytesWritten += iLength;
+        l.unlock();
+        enqueueOperations(task, objectsToRead, objectsToWrite);
     }
-    l.unlock();
-    enqueueOperations(task, objectsToRead, objectsToWrite);
 }
 
 /***********************************************
@@ -471,69 +479,76 @@ void BlockOperations::performWriteSame
         return;
     }
 
-    std::shared_ptr<std::string> bytes;
-    writeTask->getWriteBuffer(bytes);
+    if ((ApiErrorCode::XDI_OK != e) && (ApiErrorCode::XDI_MISSING_BLOB != e)) {
+        LOGERROR("handle:{} error:{} read blob error", requestId.handle, static_cast<std::underlying_type<ApiErrorCode>::type>(e));
+        std::queue<BlockTask*> queue;
+        ctx->failWriteRequest(newOffset.startBlockOffset, queue);
+        l.unlock();
+        respondToWrites(queue, e);
+    } else {
+        std::shared_ptr<std::string> bytes;
+        writeTask->getWriteBuffer(bytes);
 
-    auto bufsize = bytes->size();
+        auto bufsize = bytes->size();
 
-    // Override the number of objects will full objects being written.
-    writeTask->setNumBlocks(newOffset.numFullBlocks);
+        // Override the number of objects will full objects being written.
+        writeTask->setNumBlocks(newOffset.numFullBlocks);
 
-    read_map objectsToRead;
-    write_map objectsToWrite;
+        read_map objectsToRead;
+        write_map objectsToWrite;
 
-    uint32_t seqId = 0;
-    // Determine if we need to write a full object
-    if (0 < newOffset.numFullBlocks) {
-        LOGTRACE("fullobjects:{} blockoffset:{}", newOffset.numFullBlocks, newOffset.fullStartBlockOffset);
-        auto writeBuf = std::make_shared<std::string>();
-        for (unsigned int i = 0; i < maxObjectSizeInBytes / bufsize; ++i) {
-            *writeBuf += *bytes;
-        }
-        writeTask->keepBufferForWrite(seqId, newOffset.fullStartBlockOffset, ZERO_OFFSET, writeBuf);
-        writeTask->setRepeatingBlock(seqId);
-        xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
-        for (unsigned int o = 0; o < newOffset.numFullBlocks; ++o) {
-            auto currentOffset = newOffset.fullStartBlockOffset + o;
-            auto queueResp = ctx->queue_update(currentOffset, reqId);
-            if (WriteContext::QueueResult::FirstEntry == queueResp) {
-                ctx->setOffsetObjectBuffer(currentOffset, writeBuf);
-                ctx->triggerWrite(currentOffset);
-            } else {
-                LOGERROR("handle:{} requires exclusive access to range", requestId.handle);
-                return;
+        uint32_t seqId = 0;
+        // Determine if we need to write a full object
+        if (0 < newOffset.numFullBlocks) {
+            LOGTRACE("fullobjects:{} blockoffset:{}", newOffset.numFullBlocks, newOffset.fullStartBlockOffset);
+            auto writeBuf = std::make_shared<std::string>();
+            for (unsigned int i = 0; i < maxObjectSizeInBytes / bufsize; ++i) {
+                *writeBuf += *bytes;
             }
+            writeTask->keepBufferForWrite(seqId, newOffset.fullStartBlockOffset, ZERO_OFFSET, writeBuf);
+            writeTask->setRepeatingBlock(seqId);
+            xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
+            for (unsigned int o = 0; o < newOffset.numFullBlocks; ++o) {
+                auto currentOffset = newOffset.fullStartBlockOffset + o;
+                auto queueResp = ctx->queue_update(currentOffset, reqId);
+                if (WriteContext::QueueResult::FirstEntry == queueResp) {
+                    ctx->setOffsetObjectBuffer(currentOffset, writeBuf);
+                    ctx->triggerWrite(currentOffset);
+                } else {
+                    LOGERROR("handle:{} requires exclusive access to range", requestId.handle);
+                    return;
+                }
+            }
+            objectsToWrite.emplace(seqId, writeBuf);
+            seqId++;
         }
-        objectsToWrite.emplace(seqId, writeBuf);
-        seqId++;
+        // Determine if we need a RMW for the first block
+        if (0 < newOffset.startDiffOffset) {
+            auto const& startBlockOffset = newOffset.startBlockOffset;
+            LOGDEBUG("offset:{}", startBlockOffset);
+            auto writeBuf = std::make_shared<std::string>();
+            auto writeLength = (maxObjectSizeInBytes - newOffset.startDiffOffset);
+            if (true == newOffset.isSingleObject()) {
+                writeLength -= newOffset.endDiffOffset;
+            }
+            for (unsigned int i = 0; i <  writeLength / bufsize; ++i) {
+                *writeBuf += *bytes;
+            }
+            queuePartialWrite(requestId, resp, writeTask, seqId, objectsToRead, objectsToWrite, writeBuf, startBlockOffset, newOffset.startDiffOffset, isNewBlob);
+        }
+        // Determine if we need a RMW for the last block
+        if (((false == newOffset.isSingleObject()) || (0 == newOffset.startDiffOffset)) && (0 < newOffset.endDiffOffset)) {
+            auto const& endBlockOffset = newOffset.endBlockOffset;
+            LOGDEBUG("offset:{}", endBlockOffset);
+            auto writeBuf = std::make_shared<std::string>();
+            for (unsigned int i = 0; i < (maxObjectSizeInBytes - newOffset.endDiffOffset) / bufsize; ++i) {
+                *writeBuf += *bytes;
+            }
+            queuePartialWrite(requestId, resp, writeTask, seqId, objectsToRead, objectsToWrite, writeBuf, endBlockOffset, ZERO_OFFSET, isNewBlob);
+        }
+        l.unlock();
+        enqueueOperations(task, objectsToRead, objectsToWrite);
     }
-    // Determine if we need a RMW for the first block
-    if (0 < newOffset.startDiffOffset) {
-        auto const& startBlockOffset = newOffset.startBlockOffset;
-        LOGDEBUG("offset:{}", startBlockOffset);
-        auto writeBuf = std::make_shared<std::string>();
-        auto writeLength = (maxObjectSizeInBytes - newOffset.startDiffOffset);
-        if (true == newOffset.isSingleObject()) {
-            writeLength -= newOffset.endDiffOffset;
-        }
-        for (unsigned int i = 0; i <  writeLength / bufsize; ++i) {
-            *writeBuf += *bytes;
-        }
-        queuePartialWrite(requestId, resp, writeTask, seqId, objectsToRead, objectsToWrite, writeBuf, startBlockOffset, newOffset.startDiffOffset, isNewBlob);
-    }
-    // Determine if we need a RMW for the last block
-    if (((false == newOffset.isSingleObject()) || (0 == newOffset.startDiffOffset)) && (0 < newOffset.endDiffOffset)) {
-        auto const& endBlockOffset = newOffset.endBlockOffset;
-        LOGDEBUG("offset:{}", endBlockOffset);
-        auto writeBuf = std::make_shared<std::string>();
-        for (unsigned int i = 0; i < (maxObjectSizeInBytes - newOffset.endDiffOffset) / bufsize; ++i) {
-            *writeBuf += *bytes;
-        }
-        queuePartialWrite(requestId, resp, writeTask, seqId, objectsToRead, objectsToWrite, writeBuf, endBlockOffset, ZERO_OFFSET, isNewBlob);
-    }
-    l.unlock();
-    enqueueOperations(task, objectsToRead, objectsToWrite);
-
 }
 
 void BlockOperations::performUnmap
@@ -560,52 +575,60 @@ void BlockOperations::performUnmap
         return;
     }
 
-    read_map objectsToRead;
-    write_map objectsToWrite;
-    UnmapTask::block_offset_list fullObjects;
-    uint32_t seqId = 0;
-    while (true == unmapTask->getNextRange(context, offset, length)) {
-        OffsetInfo newOffset;
-        calculateOffsets(newOffset, offset, length, maxObjectSizeInBytes);
-        //LOGTRACE("{}", newOffset);
-        if ((true == newOffset.isSingleObject()) && (length < maxObjectSizeInBytes)) {
-            auto writeBuf = std::make_shared<std::string>(length, '\0');
-            queuePartialWrite(requestId, resp, unmapTask, seqId, objectsToRead, objectsToWrite, writeBuf, newOffset.startBlockOffset, newOffset.startDiffOffset, isNewBlob);
-        } else {
-            if (true == newOffset.spansFullBlocks) {
-                for (auto i = newOffset.fullStartBlockOffset; i <= newOffset.fullEndBlockOffset; ++i) {
-                    fullObjects.emplace(i);
+    if ((ApiErrorCode::XDI_OK != e) && (ApiErrorCode::XDI_MISSING_BLOB != e)) {
+        LOGERROR("handle:{} error:{} read blob error", requestId.handle, static_cast<std::underlying_type<ApiErrorCode>::type>(e));
+        std::queue<BlockTask*> queue;
+        ctx->failWriteRequest(totalStartBlockOffset, queue);
+        l.unlock();
+        respondToWrites(queue, e);
+    } else {
+        read_map objectsToRead;
+        write_map objectsToWrite;
+        UnmapTask::block_offset_list fullObjects;
+        uint32_t seqId = 0;
+        while (true == unmapTask->getNextRange(context, offset, length)) {
+            OffsetInfo newOffset;
+            calculateOffsets(newOffset, offset, length, maxObjectSizeInBytes);
+            //LOGTRACE("{}", newOffset);
+            if ((true == newOffset.isSingleObject()) && (length < maxObjectSizeInBytes)) {
+                auto writeBuf = std::make_shared<std::string>(length, '\0');
+                queuePartialWrite(requestId, resp, unmapTask, seqId, objectsToRead, objectsToWrite, writeBuf, newOffset.startBlockOffset, newOffset.startDiffOffset, isNewBlob);
+            } else {
+                if (true == newOffset.spansFullBlocks) {
+                    for (auto i = newOffset.fullStartBlockOffset; i <= newOffset.fullEndBlockOffset; ++i) {
+                        fullObjects.emplace(i);
+                    }
+                }
+                if (0 < newOffset.startDiffOffset) {
+                    auto writeBuf = std::make_shared<std::string>(maxObjectSizeInBytes - newOffset.startDiffOffset, '\0');
+                    queuePartialWrite(requestId, resp, unmapTask, seqId, objectsToRead, objectsToWrite, writeBuf, newOffset.startBlockOffset, newOffset.startDiffOffset, isNewBlob);
+                }
+                if (0 < newOffset.endDiffOffset) {
+                    auto writeBuf = std::make_shared<std::string>(maxObjectSizeInBytes - newOffset.endDiffOffset, '\0');
+                    queuePartialWrite(requestId, resp, unmapTask, seqId, objectsToRead, objectsToWrite, writeBuf, newOffset.endBlockOffset, ZERO_OFFSET, isNewBlob);
                 }
             }
-            if (0 < newOffset.startDiffOffset) {
-                auto writeBuf = std::make_shared<std::string>(maxObjectSizeInBytes - newOffset.startDiffOffset, '\0');
-                queuePartialWrite(requestId, resp, unmapTask, seqId, objectsToRead, objectsToWrite, writeBuf, newOffset.startBlockOffset, newOffset.startDiffOffset, isNewBlob);
-            }
-            if (0 < newOffset.endDiffOffset) {
-                auto writeBuf = std::make_shared<std::string>(maxObjectSizeInBytes - newOffset.endDiffOffset, '\0');
-                queuePartialWrite(requestId, resp, unmapTask, seqId, objectsToRead, objectsToWrite, writeBuf, newOffset.endBlockOffset, ZERO_OFFSET, isNewBlob);
-            }
         }
-    }
-    if (0 < fullObjects.size()) {
-        auto writeBuf = std::make_shared<std::string>(maxObjectSizeInBytes, '\0');
-        unmapTask->keepBufferForWrite(seqId, *(fullObjects.begin()), ZERO_OFFSET, writeBuf);
-        unmapTask->setRepeatingBlock(seqId);
-        xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
-        for (auto const& o : fullObjects) {
-            auto queueResp = ctx->queue_update(o, reqId);
-            if (WriteContext::QueueResult::FirstEntry != queueResp) {
-               LOGERROR("handle:{} requires exclusive access to range", requestId.handle);
-               return;
+        if (0 < fullObjects.size()) {
+            auto writeBuf = std::make_shared<std::string>(maxObjectSizeInBytes, '\0');
+            unmapTask->keepBufferForWrite(seqId, *(fullObjects.begin()), ZERO_OFFSET, writeBuf);
+            unmapTask->setRepeatingBlock(seqId);
+            xdi_handle reqId{task->getProtoTask()->getHandle(), seqId};
+            for (auto const& o : fullObjects) {
+                auto queueResp = ctx->queue_update(o, reqId);
+                if (WriteContext::QueueResult::FirstEntry != queueResp) {
+                   LOGERROR("handle:{} requires exclusive access to range", requestId.handle);
+                   return;
+                }
+                ctx->setOffsetObjectBuffer(o, writeBuf);
+                ctx->triggerWrite(o);
             }
-            ctx->setOffsetObjectBuffer(o, writeBuf);
-            ctx->triggerWrite(o);
+            unmapTask->swapFullBlockOffsets(fullObjects);
+            objectsToWrite.emplace(seqId, writeBuf);
         }
-        unmapTask->swapFullBlockOffsets(fullObjects);
-        objectsToWrite.emplace(seqId, writeBuf);
+        l.unlock();
+        enqueueOperations(task, objectsToRead, objectsToWrite);
     }
-    l.unlock();
-    enqueueOperations(task, objectsToRead, objectsToWrite);
 }
 
 void BlockOperations::queuePartialWrite
@@ -667,6 +690,7 @@ void BlockOperations::writeBlobResp
         ctx->completeBlobWrite(offset, awaitingQueue);
     }
     if (ApiErrorCode::XDI_OK != e) {
+        LOGERROR("handle:{} error:{} write blob error", requestId.handle, static_cast<std::underlying_type<ApiErrorCode>::type>(e));
         respondToWrites(awaitingQueue, e);
     } else {
         while (false == awaitingQueue.empty()) {
@@ -687,10 +711,32 @@ void BlockOperations::readObjectResp
 {
     auto task = findResponse(requestId.handle);
     if (nullptr == task) return;
+    bool isWriteTask { false };
     TaskVisitor v;
     if ((TaskType::WRITE == task->match(&v)) ||
-        (TaskType::WRITESAME == task->match(&v)) ||
-        (TaskType::UNMAPTASK == task->match(&v)))  {
+            (TaskType::WRITESAME == task->match(&v)) ||
+            (TaskType::UNMAPTASK == task->match(&v)))  {
+        isWriteTask = true;
+    }
+    if (ApiErrorCode::XDI_OK != e) {
+        LOGERROR("handle:{} error:{} read object error", requestId.handle, static_cast<std::underlying_type<ApiErrorCode>::type>(e));
+        if (true == isWriteTask) {
+            auto writeTask = static_cast<WriteTask*>(task);
+            auto offset = writeTask->getOffset(requestId.seq);
+            std::queue<BlockTask*> queue;
+            {
+                std::lock_guard<std::mutex> lg(drainChainMutex);
+                ctx->failWriteRequest(offset, queue);
+            }
+            respondToWrites(queue, e);
+        } else {
+            task->getProtoTask()->setError(e);
+            finishResponse(task);
+        }
+        return;
+    }
+
+    if (true == isWriteTask) {
         auto writeTask = static_cast<WriteTask*>(task);
         auto offset = writeTask->getOffset(requestId.seq);
         auto new_data = writeTask->handleRMWResponse(resp, requestId.seq);
@@ -721,11 +767,8 @@ void BlockOperations::readObjectResp
         if (readObjects.end() == itr) {
             LOGERROR("handle:{} missing readObject entry", requestId.handle);
             return;
-        } else if (ApiErrorCode::XDI_OK == e) {
-            (*itr->second)[requestId.seq] = resp;
         } else {
-            LOGTRACE("err:{} offset:{}", static_cast<std::underlying_type<ApiErrorCode>::type>(e), readTask->getStartBlockOffset() + requestId.seq);
-            (*itr->second)[requestId.seq] = empty_buffer;
+            (*itr->second)[requestId.seq] = resp;
         }
         readTask->increaseReadBlockCount();
 
@@ -752,8 +795,9 @@ void BlockOperations::writeObjectResp
     std::unique_lock<std::mutex> l(drainChainMutex);
     TaskVisitor v;
     if (ApiErrorCode::XDI_OK != e) {
+        LOGERROR("handle:{} error:{} write object error", requestId.handle, static_cast<std::underlying_type<ApiErrorCode>::type>(e));
         std::queue<BlockTask*> queue;
-        ctx->failWriteBlobRequest(offset, queue);
+        ctx->failWriteRequest(offset, queue);
         l.unlock();
         respondToWrites(queue, e);
     } else {
