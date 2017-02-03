@@ -51,7 +51,7 @@ public:
     ReadBlobResult addReadBlob(ObjectOffsetVal const& startOffset, ObjectOffsetVal const& endOffset, BlockTask* task, bool reserveRange);
 
     bool getWriteBlobRequest(ObjectOffsetVal const& offset, WriteBlobRequest& req, PendingTasks& queue);
-    bool failWriteBlobRequest(ObjectOffsetVal const& offset, PendingTasks& queue);
+    bool failWriteRequest(ObjectOffsetVal const& offset, PendingTasks& queue);
     void triggerWrite(ObjectOffsetVal const& offset);
 
     int getNumPendingBlobs() { return _pendingBlobWrites.size(); };

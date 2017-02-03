@@ -317,7 +317,7 @@ TEST_F(TestWriteContextFixture, FailBlob) {
 
     xdi::WriteBlobRequest req;
     fds::block::WriteContext::PendingTasks q;
-    EXPECT_TRUE(ctx->failWriteBlobRequest(0, q));
+    EXPECT_TRUE(ctx->failWriteRequest(0, q));
     EXPECT_EQ(0, ctx->getNumPendingBlobs());
 }
 
