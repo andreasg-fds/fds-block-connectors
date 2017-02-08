@@ -64,7 +64,7 @@ struct ScstTarget
     bool enabled() const
     { std::lock_guard<std::mutex> lg(deviceLock); return State::RUNNING == state; }
 
-    void addDevice(volume_ptr& vol_desc);
+    void addDevice(volume_ptr const& vol_desc);
     void deviceDone(std::string const& volume_name, bool const and_removed);
     void removeDevice(std::string const& volume_name);
     void setCHAPCreds(ScstAdmin::credential_map& incoming_credentials,
