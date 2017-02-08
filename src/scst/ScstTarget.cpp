@@ -69,7 +69,7 @@ ScstTarget::ScstTarget(ScstConnector* parent_connector,
 ScstTarget::~ScstTarget() = default;
 
 void
-ScstTarget::addDevice(volume_ptr& vol_desc) {
+ScstTarget::addDevice(volume_ptr const& vol_desc) {
     std::unique_lock<std::mutex> l(deviceLock);
 
     // Check if we have a device with this name already

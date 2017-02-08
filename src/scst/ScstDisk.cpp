@@ -49,7 +49,7 @@ namespace fds {
 namespace connector {
 namespace scst {
 
-ScstDisk::ScstDisk(volume_ptr& vol_desc,
+ScstDisk::ScstDisk(volume_ptr const& vol_desc,
                    ScstTarget* target,
                    std::shared_ptr<xdi::ApiInterface> api)
         : ScstDevice(vol_desc->volumeName, target),

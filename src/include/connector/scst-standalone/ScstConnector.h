@@ -21,6 +21,7 @@
 #define SOURCE_ACCESS_MGR_INCLUDE_CONNECTOR_SCST_STANDALONE_SCSTCONNECTOR_H_
 
 #include <condition_variable>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -94,6 +95,7 @@ struct ScstConnector : public xdi::ApiResponseInterface
     std::condition_variable done_condition_;
     std::map<volume_ptr, std::unique_ptr<ScstTarget>> targets_;
     std::set<xdi::VolumeId> black_listed_vols;
+    std::list<volume_ptr> list_response_;
 
     ScstConnector(std::string const& prefix,
                   size_t const queue_depth,
@@ -104,8 +106,7 @@ struct ScstConnector : public xdi::ApiResponseInterface
     std::string target_prefix;
     size_t queue_depth {0};
 
-    bool addTarget(volume_ptr& volDesc);
-    void removeTarget(volume_ptr const& volDesc);
+    bool addTarget(volume_ptr const& volDesc);
     void discoverTargets();
     void terminate();
 };

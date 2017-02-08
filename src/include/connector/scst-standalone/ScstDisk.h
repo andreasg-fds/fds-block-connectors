@@ -40,7 +40,7 @@ struct ScstDisk : public ScstDevice,
                   public fds::block::BlockOperations {
     using volume_ptr = std::shared_ptr<xdi::IscsiVolumeDescriptor>;
 
-    ScstDisk(volume_ptr& vol_desc, ScstTarget* target, std::shared_ptr<xdi::ApiInterface> api);
+    ScstDisk(volume_ptr const& vol_desc, ScstTarget* target, std::shared_ptr<xdi::ApiInterface> api);
     ScstDisk(ScstDisk const& rhs) = delete;
     ScstDisk(ScstDisk const&& rhs) = delete;
     ScstDisk operator=(ScstDisk const& rhs) = delete;

@@ -93,7 +93,7 @@ void ScstConnector::targetDone(const std::string target_name) {
     done_condition_.notify_one();
 }
 
-bool ScstConnector::addTarget(volume_ptr& volDesc) {
+bool ScstConnector::addTarget(volume_ptr const& volDesc) {
     // Create target if it does not already exist
     auto target_name = target_prefix + volDesc->volumeName;
 
@@ -183,15 +183,6 @@ bool ScstConnector::addTarget(volume_ptr& volDesc) {
     return target_added;
 }
 
-void ScstConnector::removeTarget(volume_ptr const& volDesc) {
-    for (auto const& target_pair : targets_) {
-        if (target_pair.first->volumeName == volDesc->volumeName &&
-            target_pair.first->volumeId == volDesc->volumeId) {
-            target_pair.second->removeDevice(volDesc->volumeName);
-        }
-    }
-}
-
 ScstConnector::ScstConnector(std::string const& prefix,
                              size_t const depth,
                              std::shared_ptr<xdi::ApiInterface> api)
@@ -216,7 +207,30 @@ ScstConnector::discoverTargets() {
         getting_list = true;
         api_->listAllVolumes(r, req);
         std::unique_lock<std::mutex> lk(target_lock_);
+        // Wait for the response to come back
         listing_condition_.wait(lk, [this] () -> bool { return !getting_list; });
+
+        // Volume mgmt is a little flaky, wait till any old target of
+        // the same name is removed before adding the replacement.
+        for (auto const& vol : list_response_) {
+            auto should_add = true;
+            for (auto const& target_pair : targets_) {
+                if (target_pair.first->volumeName == vol->volumeName &&
+                    target_pair.first->volumeId != vol->volumeId) {
+                    LOGWARN("vol:{} skipping while target shuts down", vol->volumeName);
+                    target_pair.second->removeDevice(vol->volumeName);
+                    should_add = false;
+                    break;
+                }
+            }
+            if (!should_add) continue;
+
+            if (addTarget(vol)) {
+                LOGINFO("vol:{} added", vol->volumeName);
+            }
+        }
+        ScstAdmin::toggleDriver(true);
+        list_response_.clear();
         stopping_condition_.wait_for(lk, rediscovery_delay);
     }
     ScstAdmin::toggleDriver(false);
@@ -239,28 +253,9 @@ ScstConnector::listAllVolumesResp(xdi::RequestHandle const&,
                     (0 == black_listed_vols.count(vol->volumeId)) &&
                     (validateTargetName(vol->volumeName)))
                 {
-                    auto currVol = std::static_pointer_cast<xdi::IscsiVolumeDescriptor>(vol);
-                    // Volume mgmt is a little flaky, wait till any old target of
-                    // the same name is removed before adding the replacement.
-                    auto should_add = true;
-                    for (auto const& target_pair : targets_) {
-                        if (target_pair.first->volumeName == vol->volumeName &&
-                            target_pair.first->volumeId != vol->volumeId) {
-                            LOGINFO("vol:{} skipping while target shuts down", vol->volumeName);
-                            removeTarget(target_pair.first);
-                            should_add = false;
-                            break;
-                        }
-                    }
-                    if (should_add) {
-                        if (addTarget(currVol)) {
-                            LOGINFO("vol:{} added", vol->volumeName);
-                        }
-                    }
+                    list_response_.push_back(std::static_pointer_cast<xdi::IscsiVolumeDescriptor>(vol));
                 }
-
             }
-            ScstAdmin::toggleDriver(true);
         }
     }
     listing_condition_.notify_one();

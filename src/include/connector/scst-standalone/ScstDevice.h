@@ -69,8 +69,8 @@ struct ScstDevice {
 
     boost::lockfree::queue<ScstTask*> readyResponses;
 
-    scst_user_get_multi* cmds;
-    scst_user_get_cmd* cmd;
+    scst_user_get_multi* cmds {nullptr};
+    scst_user_get_cmd* cmd {nullptr};
 
     // Utility functions to build Inquiry Pages...etc
     unique<InquiryHandler> inquiry_handler;
