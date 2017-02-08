@@ -90,7 +90,7 @@ ApiErrorCode FdsStub::writeBlob(WriteBlobRequest const& req) {
     } else { // This is a new Blob
         ObjectWriteMap newMap;
         for (auto off : req.blob.objects) {
-            if (off.second.objectId == "0000000000000000000000000000000000000000") {
+            if (off.second.objectId == empty_str) {
                 continue;
             } else {
                 newMap.emplace(off.first, off.second);
