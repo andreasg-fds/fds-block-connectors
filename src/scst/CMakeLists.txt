@@ -9,5 +9,4 @@ add_library (fds-am-connector-scst SHARED
 		ScstTask.cpp)
 target_link_libraries (fds-am-connector-scst block ev config++)
 install (TARGETS fds-am-connector-scst
-		LIBRARY DESTINATION lib/connector
-		COMPONENT scst)
+		LIBRARY DESTINATION ${ARTIFACT_DIR_SCST}/lib/connector)

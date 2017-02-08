@@ -1,78 +1,122 @@
 buildscript {
-  repositories {
-    jcenter()
+  repositories{
+      mavenLocal()
+      maven {
+          url "http://fds-artifactory.formationds.com:8081/artifactory/fds-maven-all-virtual"
+      }
+  }
+  dependencies {
+      classpath group: 'com.formationds', name: 'fds-build-version-plugin', version: '2.0-SNAPSHOT'
+      classpath group: 'com.formationds', name: 'fds-build-upload-plugin', version: '1.0-SNAPSHOT'
   }
 }
 
-plugins {
-  id "nebula.ospackage" version "3.2.0"
+apply plugin: 'com.formationds.fds-build-version-plugin'
+apply plugin: 'com.formationds.fds-build-upload-plugin'
+
+if ( !project.hasProperty( 'packageType' ) ){
+
+    project.ext.packageType = 'dev'
+
+    if ( System.env.ghprbPullId != null ){
+        project.ext.packageType = 'pr'
+    }
 }
 
-task cleanBuild(type: Exec){
+if (project.ext.packageType == 'release'){
+    project.ext.buildType = 'release'
+}
+else {
+    project.ext.buildType = 'debug'
+}
+
+if ( !project.hasProperty( 'username' ) ){
+    project.ext.username = '';
+}
+
+if ( !project.hasProperty( 'password' ) ){
+    project.ext.password = '';
+}
+
+versionSettings {
+    packageType = project.ext.packageType
+    username = System.env.GIT_USER
+    password = System.env.GIT_PASSWORD
+}
+
+uploadSettings {
+
+    repo = 'nightly'
+    packageDir = 'build/distributions'
+    username = project.ext.username
+    password = project.ext.password
+}
+
+task updateDevSetup( type: Exec ){
+    commandLine 'sudo', 'pip', 'install', '-U', 'fds-dev-setup', '--trusted-host', 'bld-artifactory.formationds.com', '--extra-index-url', 'http://bld-artifactory.formationds.com:8081/artifactory/api/pypi/formation-pip/simple'
+}
+
+task runInitialize( type: Exec ){
+    commandLine 'sudo', 'fds-initialize'
+}
+
+task clean(type:Exec){
     commandLine 'rm', '-rf', 'build'
 }
 
-task makeBuildDir(type:Exec) {
+task createDir( type: Exec ){
     commandLine 'mkdir', '-p', 'build'
 }
 
-task doCMake(type:Exec, dependsOn: 'makeBuildDir'){
+task preBuild( type: Exec ){
     workingDir 'build'
+    environment 'build_type', "${project.ext.buildType}"
     commandLine 'cmake', '..'
 }
 
-task buildLibs(type:Exec, dependsOn: 'doCMake'){
+task build(type: Exec){
     workingDir 'build'
     commandLine 'make'
 }
 
-task doCTest(type:Exec, dependsOn: 'build'){
+task performTests(type: Exec){
     workingDir 'build/src/tests'
     commandLine 'ctest'
 }
 
-task doCPack(type:Exec, dependsOn: 'doCTest'){
+task postBuild(type: Exec){
     workingDir 'build'
-    commandLine 'cpack', '-G', 'DEB'
+    commandLine 'make', 'install'
 }
 
-build.dependsOn buildLibs
-buildDeb.dependsOn doCPack
+task buildDeb(){
 
-task deployDeb( dependsOn: 'buildDeb' ) << {
-        if ( !project.hasProperty( 'username' ) || !project.hasProperty( 'password' ) ){
-                println 'You must specify both a -Pusername and -Ppassword value. Skipping deployDeb task.'
-                return
+    doLast {
+        ["scst", "nbd"].each {
+            def packageName = "fds-block-connectors-${it}-${project.ext.buildType}-${project.ext.PACKAGE_VERSION}"
+            def artifactDir = "${buildDir}/artifacts-${it}"
+            println "Version: " + project.ext.PACKAGE_VERSION
+            println "Dir: " + artifactDir
+            println "PackageName: " + packageName
+    
+            exec {
+                commandLine 'mkdir', '-p', "${buildDir}/distributions"
+            }
+    
+            exec {
+               commandLine '/usr/local/bin/fpm', '-s', 'dir', '-t', 'deb', '--prefix', "/opt/fds/formation_one/packages/${packageName}", '-C', "${artifactDir}", '--name', "${packageName}", '--version', "${project.ext.PACKAGE_VERSION}", '-p', "${buildDir}/distributions"
+            }
         }
-
-        def debNames = []
-        new File( 'build' ).eachFile( { f ->
-                if ( f.name.endsWith( 'deb' ) ) {
-                        debNames << f.name
-                }
-        })
-
-        if ( debNames.empty ) {
-                println 'Nothing to deploy'
-                return
-        }
-
-	debNames.each {
-		println it
-
-		def deploy_artifactory_local = 'curl -v -X PUT http://' + username + ':' + password + '@bld-artifactory:8081/artifactory/formation-apt/pool/nightly/' + it + ';deb.distribution=platform;deb.component=nightly;deb.architecture=amd64 -T ' + 'build/' + it
-
-		println deploy_artifactory_local
-
-		def proc_local = deploy_artifactory_local.execute()
-
-		proc_local.text.eachLine { line -> println line }
-
-		if ( proc_local.exitValue() ) {
-			println 'Artifact upload to local artifactory failed.'
-			return;
-		}
-	}
+    }
 }
 
-clean.dependsOn cleanBuild
+runInitialize.dependsOn updateDevSetup
+handleVersion.dependsOn runInitialize
+createDir.dependsOn handleVersion
+preBuild.dependsOn createDir
+build.dependsOn preBuild
+performTests.dependsOn build
+postBuild.dependsOn performTests
+buildDeb.dependsOn postBuild
+rollVersion.dependsOn build
+uploadDeb.dependsOn buildDeb

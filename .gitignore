@@ -32,3 +32,6 @@ build/
 # Build System Extras
 .gradle
 fds_dev_setup.log
+gradlew.bat
+SHA
+VERSION.tmp
