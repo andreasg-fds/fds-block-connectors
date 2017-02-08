@@ -24,6 +24,8 @@
 
 namespace xdi {
 
+static std::string const empty_str(20, '\0');
+
 FdsStub::FdsStub() : _nextId(0) {
 
 }
@@ -40,7 +42,8 @@ ObjectId FdsStub::writeObject(WriteObjectRequest const& req) {
 
 ApiErrorCode FdsStub::readObject(ReadObjectRequest const& req, std::shared_ptr<std::string>& buf) {
     std::lock_guard<std::mutex> lg(_objectsLock);
-    if (req.id == "0000000000000000000000000000000000000000") {
+
+    if (req.id == empty_str) {
         return ApiErrorCode::XDI_OK;
     }
     auto itr = _objects.find(req.id);
@@ -58,7 +61,7 @@ ApiErrorCode FdsStub::writeBlob(WriteBlobRequest const& req) {
     if (_blobs.end() != itr) { // Blob exists, this is an update
         for (auto off : req.blob.objects) {
             // We don't write a null object
-            if (off.second.objectId == "0000000000000000000000000000000000000000") {
+            if (off.second.objectId == empty_str) {
                 continue;
             }
 
